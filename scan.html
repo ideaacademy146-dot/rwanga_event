@@ -285,7 +285,7 @@
     if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
     $('startScanBtn').textContent = 'کردنەوەی کامێرا';
   }
-  $('startScanBtn').addEventListener('click', ()=>{ if(scanning) stopCamera(); else startCamera(); });
+  $('startScanBtn').addEventListener('click', ()=>{ getAudioCtx(); if(scanning) stopCamera(); else startCamera(); });
 
   const scanCanvas = document.createElement('canvas');
   let lastScanTime = 0;
@@ -308,6 +308,7 @@
   }
 
   async function handleCode(code){
+    getAudioCtx(); // دڵنیابوونەوە لەوەی دەنگ کراوەیە پێش هەر پشکنینێک
     code = code.toUpperCase();
     $('resultCard').style.display = 'block';
     $('resultCard').className = 'result-card';
