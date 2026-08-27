@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>ئیڤینتی ئاراستەی زانکۆ - سکانکردن (ئەدمین)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
-<script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
+<script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
 <style>
   :root{
     --navy-900:#081b34; --navy-800:#0c2748; --navy-600:#164a86; --navy-500:#1d5fa8;
@@ -130,6 +130,20 @@
     </div>
 
     <div id="tab-dashboard" hidden>
+      <div class="card" style="margin-bottom:14px;">
+        <h2 style="margin-bottom:8px;">پیشاندان بەپێی شار</h2>
+        <select id="citySelect">
+          <option value="">هەموو شارەکان</option>
+          <option value="هەولێر">هەولێر</option>
+          <option value="ئاکرێ">ئاکرێ</option>
+          <option value="هەریر">هەریر</option>
+          <option value="رانیە">رانیە</option>
+          <option value="کەلار">کەلار</option>
+          <option value="سڵیمانی">سڵیمانی</option>
+          <option value="سۆران">سۆران</option>
+          <option value="دهۆک">دهۆک</option>
+        </select>
+      </div>
       <div class="stat-grid">
         <div class="stat"><div class="num" id="statReg">0</div><div class="lbl">تۆمارکراو</div></div>
         <div class="stat"><div class="num" id="statIn">0</div><div class="lbl">چوونەژوورەوە</div></div>
@@ -138,6 +152,8 @@
         <div class="bar-bg"><div class="bar-fill" id="barFill"></div></div>
         <div class="hint" id="barLabel" style="text-align:center;margin-top:8px;">٪٠ چوونەژوورەوە</div>
         <button class="secondary" id="refreshBtn">نوێکردنەوە</button>
+        <button class="secondary" id="reportBtn">داگرتنی ڕاپۆرت (CSV)</button>
+        <div class="hint" id="reportHint" style="text-align:center;margin-top:6px;"></div>
       </div>
     </div>
 
@@ -450,7 +466,8 @@
   // ---------- dashboard ----------
   async function refreshStats(){
     try{
-      const r=await callApi({action:'stats'});
+      const city=$('citySelect').value;
+      const r=await callApi({action:'stats',city});
       const regCount=r.total||0, inCount=r.checkedIn||0;
       $('statReg').textContent=regCount;
       $('statIn').textContent=inCount;
@@ -460,6 +477,46 @@
     }catch(e){console.error(e);}
   }
   $('refreshBtn').addEventListener('click',refreshStats);
+  $('citySelect').addEventListener('change',refreshStats);
+
+  // ---------- CSV report ----------
+  function csvEscape(v){
+    v=String(v==null?'':v);
+    if(/[",\n]/.test(v)) v='"'+v.replace(/"/g,'""')+'"';
+    return v;
+  }
+  async function downloadReport(){
+    $('reportBtn').disabled=true;
+    $('reportHint').textContent='چاوەڕێ بە، ڕاپۆرت ئامادە دەکرێت...';
+    try{
+      const city=$('citySelect').value;
+      const r=await callApi({action:'report',city,adminKey:adminKey()});
+      if(!r.success){
+        $('reportHint').textContent='هەڵە: '+(r.error||'نەزانراو');
+        return;
+      }
+      const headers=['ID','ناوی سیانی','تەمەن','ئامادەیی','مۆبایل','لق','ڕەگەز','نمرە','شار','دڵخواز','دیاری چاوەڕوانکراو','چوونەژوورەوە','کاتی چوونەژوورەوە'];
+      const rows=r.records.map(rec=>[
+        rec.id,rec.fullName,rec.age,rec.school,rec.phone,rec.branch,rec.gender,rec.score,
+        rec.city,rec.favorite,rec.giftExpectation,(rec.checkedIn?'بەڵێ':'نەخێر'),rec.checkinTime
+      ]);
+      const csv='\uFEFF'+[headers,...rows].map(row=>row.map(csvEscape).join(',')).join('\r\n');
+      const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download='raport-'+(city||'hemuu')+'-'+new Date().toISOString().slice(0,10)+'.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+      $('reportHint').textContent='ڕاپۆرت دابەزێنرا ('+r.records.length+' تۆمار).';
+    }catch(e){
+      console.error(e);
+      $('reportHint').textContent='پەیوەندی بە سیستەمەکەوە نەکرا.';
+    }finally{
+      $('reportBtn').disabled=false;
+    }
+  }
+  $('reportBtn').addEventListener('click',downloadReport);
 </script>
 </body>
 </html>
