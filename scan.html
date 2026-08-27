@@ -175,8 +175,17 @@
 
   async function callApi(params){
     const url = CONFIG.SCRIPT_URL + '?' + new URLSearchParams(params).toString();
-    const res = await fetch(url);
-    return res.json();
+    const res = await fetch(url, { method:'GET', redirect:'follow', cache:'no-store' });
+    const text = await res.text();
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    try {
+      return JSON.parse(text);
+    } catch(err) {
+      // Apps Script sometimes returns an HTML error/login page instead of JSON.
+      // Keep the original UI and show a useful error instead of crashing on JSON.parse.
+      const looksHtml = /^\s*<!doctype|^\s*<html/i.test(text);
+      throw new Error(looksHtml ? 'Web App ـەکە JSON نەگەڕاندەوە. Deploy ـەکەی Web App بپشکنە.' : 'وەڵامی نادروستی Web App');
+    }
   }
 
   function adminKey(){ return sessionStorage.getItem('adminKey') || ''; }
@@ -299,6 +308,7 @@
         $('resultStatus').textContent = '🔒 کۆدی ئەدمین نادروستە';
         $('resultName').textContent = '';
         $('resultTime').textContent = 'دووبارە بچۆرەوە ژوورەوە.';
+        showScanNotification('bad','ڕێگەپێدان نییە','','کۆدی ئەدمین نادروستە یان session ـەکە بەسەرچووە.');
       } else {
         $('resultCard').className = 'result-card bad';
         $('resultStatus').textContent = '❌ ئەم کۆدە تۆمار نەکراوە';
@@ -324,7 +334,7 @@
   // ---- dashboard ----
   async function refreshStats(){
     try{
-      const r = await callApi({ action:'stats' });
+      const r = await callApi({ action:'stats', adminKey: adminKey() });
       const regCount = r.total || 0;
       const inCount = r.checkedIn || 0;
       $('statReg').textContent = regCount;
