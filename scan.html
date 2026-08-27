@@ -249,7 +249,7 @@
       $('startScanBtn').textContent = 'داخستنی کامێرا';
       $('resultCard').style.display = 'block';
       $('resultCard').className = 'result-card';
-      $('resultStatus').textContent = '📷 کامێرا چالاکە — QR دەگەڕێین';
+      $('resultStatus').textContent = '📷 کامێرا چالاکە — QR بە خۆکارانە پشکنین دەکرێت';
       $('resultName').textContent = 'QR ـەکە لە ناو چوارچێوەکەدا بگرە';
       $('resultTime').textContent = '';
       requestAnimationFrame(scanLoop);
@@ -262,6 +262,7 @@
 
   function stopCamera(){
     scanning = false;
+    if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
     if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
     $('startScanBtn').textContent = 'کردنەوەی کامێرا';
   }
@@ -271,55 +272,72 @@
     else startCamera();
   });
 
+  // ---- fast QR scanner: native BarcodeDetector first, jsQR fallback ----
   const scanCanvas = document.createElement('canvas');
   const scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
+  let nativeDetector = null;
+  try {
+    if ('BarcodeDetector' in window) nativeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+  } catch (_) { nativeDetector = null; }
 
-  function tryDecodeCanvas(){
-    const vw = videoEl.videoWidth;
-    const vh = videoEl.videoHeight;
-    if(!vw || !vh) return null;
+  async function tryNativeQR(){
+    if(!nativeDetector || videoEl.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return null;
+    try{
+      const codes = await nativeDetector.detect(videoEl);
+      if(codes && codes.length && codes[0].rawValue) return codes[0].rawValue;
+    }catch(e){}
+    return null;
+  }
 
-    // Keep enough resolution for small QR codes, but avoid huge canvases on phones.
-    const maxW = 1280;
+  function tryJsQR(){
+    const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+    if(!vw || !vh || typeof window.jsQR !== 'function') return null;
+    const maxW = 1440;
     const scale = Math.min(1, maxW / vw);
     scanCanvas.width = Math.max(1, Math.round(vw * scale));
     scanCanvas.height = Math.max(1, Math.round(vh * scale));
     scanCtx.drawImage(videoEl, 0, 0, scanCanvas.width, scanCanvas.height);
 
-    const imageData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
-    let code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'attemptBoth'
-    });
+    let imageData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+    let code = window.jsQR(imageData.data, imageData.width, imageData.height, {inversionAttempts:'attemptBoth'});
     if(code && code.data) return code.data;
 
-    // QR is normally inside the visible guide. Try the middle 80% at full crop resolution.
-    const cropW = Math.floor(scanCanvas.width * 0.82);
-    const cropH = Math.floor(scanCanvas.height * 0.82);
+    const cropW = Math.floor(scanCanvas.width * 0.88);
+    const cropH = Math.floor(scanCanvas.height * 0.88);
     const sx = Math.floor((scanCanvas.width - cropW) / 2);
     const sy = Math.floor((scanCanvas.height - cropH) / 2);
-    const crop = scanCtx.getImageData(sx, sy, cropW, cropH);
-    code = jsQR(crop.data, crop.width, crop.height, { inversionAttempts:'attemptBoth' });
+    imageData = scanCtx.getImageData(sx, sy, cropW, cropH);
+    code = window.jsQR(imageData.data, imageData.width, imageData.height, {inversionAttempts:'attemptBoth'});
     return code && code.data ? code.data : null;
   }
 
+  async function scanOnce(){
+    if(!scanning || scanBusy || videoEl.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+    scanBusy = true;
+    try{
+      let data = await tryNativeQR();
+      if(!data) data = tryJsQR();
+      if(data && data.trim()){
+        const now = Date.now();
+        if(now - lastScanTime > 2000){
+          lastScanTime = now;
+          await handleCode(data.trim());
+        }
+      }
+    }catch(e){
+      console.error('QR scan error', e);
+    }finally{
+      scanBusy = false;
+    }
+  }
+
+  // Automatic scan about 3 times per second while the camera is open.
+  let scanTimer = null;
   function scanLoop(){
     if(!scanning) return;
-    if(!scanBusy && videoEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA){
-      scanBusy = true;
-      try{
-        const data = tryDecodeCanvas();
-        const now = Date.now();
-        if(data && data.trim() && (now - lastScanTime > 2500)){
-          lastScanTime = now;
-          handleCode(data.trim());
-        }
-      }catch(e){
-        console.error('QR scan error', e);
-      }finally{
-        scanBusy = false;
-      }
-    }
-    requestAnimationFrame(scanLoop);
+    scanOnce();
+    clearTimeout(scanTimer);
+    scanTimer = setTimeout(scanLoop, 350);
   }
 
   async function handleCode(code){
@@ -330,7 +348,7 @@
       const r = await callApi({ action:'checkin', code, adminKey: adminKey() });
       if(r.success){
         $('resultCard').className = 'result-card ok';
-        $('resultStatus').textContent = '🟢 قوتابی بە سەرکەوتوویی داخل بوو';
+        $('resultStatus').textContent = '✅ قوتابی داخل بوو';
         $('resultName').textContent = r.name + (r.school ? (' — ' + r.school) : '');
         $('resultTime').textContent = new Date().toLocaleTimeString('en-GB');
       } else if(r.error === 'already'){
