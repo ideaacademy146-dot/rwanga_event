@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>ئڤێنتی ئاراستەی زانکۆ - سکانکردن (ئەدمین)</title>
+<title>ئیڤینتی ئاراستەی زانکۆ - سکانکردن (ئەدمین)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
-<link href="https://kurdfont.com/css?font=rabar-022" rel="stylesheet">
 <style>
   :root{
     --navy-900:#081b34; --navy-800:#0c2748; --navy-600:#164a86; --navy-500:#1d5fa8;
@@ -13,9 +13,9 @@
     --green:#1fa957; --green-bg:#e8faf0; --amber:#c9860a; --amber-bg:#fff6e4; --red:#d64545; --red-bg:#fdeceb;
     --radius:18px; --shadow: 0 12px 30px rgba(8,27,52,0.25);
   }
-  *{box-sizing:border-box; font-family:'Rabar 022', sans-serif;}
+  *{box-sizing:border-box;}
   body{
-    margin:0; font-family:'Rabar 022', sans-serif;
+    margin:0; font-family:"Noto Sans Arabic","Segoe UI","Tahoma","Arial",sans-serif;
     background: radial-gradient(1200px 600px at 20% -10%, var(--navy-500), transparent),
                 linear-gradient(165deg, var(--navy-900), var(--navy-800) 60%, var(--navy-900));
     color:var(--white); min-height:100vh;
@@ -103,41 +103,9 @@
   .toast{ position:fixed; top:18px; left:50%; transform:translate(-50%,-20px); background:#1f8f7f; color:#fff; padding:13px 20px; border-radius:14px; font-weight:800; box-shadow:0 10px 30px rgba(0,0,0,.22); opacity:0; pointer-events:none; transition:.25s; z-index:70; }
   .toast.show{ opacity:1; transform:translate(-50%,0); }
   @media print{ body{ background:#fff !important; color:#000 !important; } body *{ visibility:hidden !important; } #printArea,#printArea *{ visibility:visible !important; } #printArea{ position:absolute; inset:0; width:100%; padding:12mm; } .no-print{ display:none !important; } }
-
-  .success-modal-backdrop{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(7,23,42,.48); z-index:100; padding:20px; }
-  .success-modal-backdrop.show{ display:flex; }
-  .success-modal{ width:min(420px,100%); background:#fff; border-radius:22px; padding:28px 22px; text-align:center; box-shadow:0 24px 70px rgba(0,0,0,.28); }
-  .success-icon{ width:72px; height:72px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 12px; font-size:38px; background:#e8f8f2; }
-  .success-modal h2{ margin:0 0 8px; color:#126f5d; font-size:24px; }
-  .success-modal .student-name{ font-size:20px; font-weight:800; color:#17324d; margin-top:8px; }
-
-
-  /* Notification for successful check-in */
-  .toast-notification{
-    position:fixed;
-    top:20px;
-    left:50%;
-    transform:translateX(-50%) translateY(-120px);
-    background:#16a34a;
-    color:#fff;
-    padding:15px 28px;
-    border-radius:12px;
-    font-size:20px;
-    font-weight:700;
-    z-index:999999;
-    opacity:0;
-    box-shadow:0 8px 25px rgba(0,0,0,.22);
-    transition:all .35s ease;
-    pointer-events:none;
-  }
-  .toast-notification.show{
-    transform:translateX(-50%) translateY(0);
-    opacity:1;
-  }
 </style>
 </head>
 <body>
-<div id="toastNotification" class="toast-notification">🔔 بلی، تۆمار کرا</div>
 <div class="stripe"></div>
 <div class="wrap">
 
@@ -155,7 +123,7 @@
       <h2>چوونەژوورەوە</h2>
       <input type="password" id="passcode" placeholder="کۆدی نهێنی">
       <div class="error-box" id="gateError"></div>
-      <button class="primary" id="gateBtn">چوونەژوورەوە</button>
+      <button type="button" class="primary" id="gateBtn">چوونەژوورەوە</button>
     </div>
   </section>
 
@@ -218,13 +186,6 @@
       </div>
     </div>
     <div class="toast" id="toast"></div>
-    <div class="success-modal-backdrop" id="successModal">
-      <div class="success-modal">
-        <div class="success-icon">✓</div>
-        <h2>قوتابی بە سەرکەوتوویی تۆمار کرا</h2>
-        <div class="student-name" id="successStudentName"></div>
-      </div>
-    </div>
 
     <div class="logout"><a id="logoutLink">دەرچوون</a></div>
   </section>
@@ -238,17 +199,6 @@
 
   const $ = (id) => document.getElementById(id);
 
-  function showRegisteredNotification(){
-    const toast = $('toastNotification');
-    if(!toast) return;
-    toast.classList.add('show');
-    clearTimeout(window.__toastTimer);
-    window.__toastTimer = setTimeout(() => {
-      toast.classList.remove('show');
-    }, 2500);
-  }
-
-
   // ===== دەنگی ئاگادارکردنەوە (بیپ) =====
   let audioCtx = null;
   function getAudioCtx(){
@@ -261,7 +211,7 @@
   }
   function beep(freq, duration, type){
     try{
-      const ctx = getAudioCtx();
+      const ctx = 
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = type || 'sine';
@@ -292,47 +242,84 @@
 
   async function callApi(params){
     const url = CONFIG.SCRIPT_URL + '?' + new URLSearchParams(params).toString();
-    const res = await fetch(url);
-    return res.json();
+    const res = await fetch(url, { method:'GET', redirect:'follow', cache:'no-store' });
+    const text = await res.text();
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    try{
+      return JSON.parse(text);
+    }catch(err){
+      throw new Error('API_INVALID_JSON');
+    }
   }
 
   function adminKey(){ return sessionStorage.getItem('adminKey') || ''; }
 
   // ---- gate ----
-  $('gateBtn').addEventListener('click', ()=>{ getAudioCtx(); doGate(); });
-  $('passcode').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); doGate(); } });
+  $('gateBtn').addEventListener('click', doGate);
+  $('passcode').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      doGate();
+    }
+  });
 
   async function doGate(){
     const key = $('passcode').value.trim();
-    $('gateError').style.display = 'none';
-    if(!key) return;
-    $('gateBtn').disabled = true;
+    const btn = $('gateBtn');
+    const errBox = $('gateError');
+
+    errBox.style.display = 'none';
+
+    if(!key){
+      errBox.textContent = 'تکایە کۆدی نهێنی داخل بکە.';
+      errBox.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'تکایە چاوەڕێ بە...';
+
     try{
-      const r = await callApi({ action:'verifyAdmin', key });
-      if(r.success){
-        showRegisteredNotification();
+      const r = await callApi({ action:'verifyAdmin', key:key });
+
+      if(r && r.success === true){
         sessionStorage.setItem('adminKey', key);
         $('gate').hidden = true;
         $('app').hidden = false;
-        refreshStats();
-      } else {
-        $('gateError').textContent = 'کۆدی نهێنی هەڵەیە.';
-        $('gateError').style.display = 'block';
+        $('passcode').value = '';
+        await refreshStats();
+      }else{
+        errBox.textContent = 'کۆدی نهێنی هەڵەیە.';
+        errBox.style.display = 'block';
       }
     }catch(e){
-      $('gateError').textContent = 'نەتوانرا پەیوەندی بکرێت. تۆڕی ئینتەرنێت بپشکنە.';
-      $('gateError').style.display = 'block';
+      errBox.textContent = 'پەیوەندی بە سیستەمەکە نەکرا. تکایە ئینتەرنێت و SCRIPT_URL بپشکنە.';
+      errBox.style.display = 'block';
+      console.error('Login error:', e);
     }finally{
-      $('gateBtn').disabled = false;
+      btn.disabled = false;
+      btn.textContent = 'چوونەژوورەوە';
     }
   }
 
-  // resume session if already verified this browser session
-  if(sessionStorage.getItem('adminKey')){
-    $('gate').hidden = true;
-    $('app').hidden = false;
-    refreshStats();
-  }
+  // Verify any saved session instead of opening the app blindly.
+  (async function restoreSession(){
+    const savedKey = adminKey();
+    if(!savedKey) return;
+
+    try{
+      const r = await callApi({ action:'verifyAdmin', key:savedKey });
+      if(r && r.success === true){
+        $('gate').hidden = true;
+        $('app').hidden = false;
+        await refreshStats();
+      }else{
+        sessionStorage.removeItem('adminKey');
+      }
+    }catch(e){
+      sessionStorage.removeItem('adminKey');
+    }
+  })();
 
   $('logoutLink').addEventListener('click', ()=>{
     sessionStorage.removeItem('adminKey');
@@ -370,7 +357,7 @@
     if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
     $('startScanBtn').textContent = 'کردنەوەی کامێرا';
   }
-  $('startScanBtn').addEventListener('click', ()=>{ getAudioCtx(); if(scanning) stopCamera(); else startCamera(); });
+  $('startScanBtn').addEventListener('click', ()=>{ if(scanning) stopCamera(); else startCamera(); });
 
   const scanCanvas = document.createElement('canvas');
   let lastScanTime = 0;
@@ -401,18 +388,8 @@
     showToast._timer = setTimeout(()=>toast.classList.remove('show'), 3000);
   }
 
-  function showSuccessNotification(name){
-    $('successStudentName').textContent = name || '';
-    $('successModal').classList.add('show');
-    clearTimeout(showSuccessNotification._timer);
-    showSuccessNotification._timer = setTimeout(()=>{
-      $('successModal').classList.remove('show');
-    }, 2800);
-  }
-
   async function handleCode(code){
-    getAudioCtx(); // دڵنیابوونەوە لەوەی دەنگ کراوەیە پێش هەر پشکنینێک
-    code = code.toUpperCase();
+        code = code.toUpperCase();
     $('resultCard').style.display = 'block';
     $('resultCard').className = 'result-card';
     try{
@@ -420,11 +397,10 @@
       if(r.success){
         $('resultCard').className = 'result-card ok';
         $('resultStatus').textContent = '✅ قوتابی تۆمار کرا';
-        $('resultName').textContent = r.name + (r.school ? (' — ' + r.school) : '');
+        $('resultName').textContent = (r.name || r.fullName || '') + (r.school ? (' — ' + r.school) : '');
         $('resultTime').textContent = new Date().toLocaleTimeString('en-GB');
         
-        showToast('🔔 قوتابی تۆمار کرا');
-        showSuccessNotification(r.name);
+        showToast('🔔 بلی، تۆمار کرا');
         refreshStats();
       } else if(r.error === 'already'){
         $('resultCard').className = 'result-card warn';
@@ -517,14 +493,13 @@
     $('reportBody').innerHTML = '<div class="hint">داتا بار دەکرێت...</div>';
     try{
       const r = await callApi({ action:'studentsByCity', city, adminKey:adminKey() });
-      if(!r.success){ throw new Error(r.error || 'studentsByCity_failed'); }
       const students = r.students || r.data || [];
       const total = students.length;
-      const checked = students.filter(x=>x.checkedIn===true || x.checkedIn==='TRUE' || x.checkedIn==='true' || x.status==='checkedIn').length;
+      const checked = students.filter(x=>x.checkedIn===true || x.checkedIn==='TRUE' || x.status==='checkedIn').length;
       $('reportInfo').textContent = 'کۆی قوتابیان: ' + total + ' — چوونەژوورەوە: ' + checked;
       if(!total){ $('reportBody').innerHTML='<div class="hint">هیچ قوتابییەک بۆ ئەم شارە نەدۆزرایەوە</div>'; return; }
       const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-      $('reportBody').innerHTML='<table class="report-table"><thead><tr><th>#</th><th>ناو</th><th>قوتابخانە</th><th>بارودۆخ</th></tr></thead><tbody>'+students.map((x,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(x.fullName||x.name||x.studentName||x.FullName||'')+'</td><td>'+esc(x.school||x.schoolName||'')+'</td><td>'+((x.checkedIn===true||x.checkedIn==='TRUE'||x.status==='checkedIn')?'چووەتە ژوورەوە':'تۆمارکراو')+'</td></tr>').join('')+'</tbody></table>';
+      $('reportBody').innerHTML='<table class="report-table"><thead><tr><th>#</th><th>ناو</th><th>قوتابخانە</th><th>بارودۆخ</th></tr></thead><tbody>'+students.map((x,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(x.name||x.studentName||'')+'</td><td>'+esc(x.school||x.schoolName||'')+'</td><td>'+((x.checkedIn===true||x.checkedIn==='TRUE'||x.status==='checkedIn')?'چووەتە ژوورەوە':'تۆمارکراو')+'</td></tr>').join('')+'</tbody></table>';
     }catch(e){
       $('reportInfo').textContent='';
       $('reportBody').innerHTML='<div class="hint">نەتوانرا لیستی قوتابیان بهێنرێت. پێویستە لە Apps Script کردارێکی studentsByCity زیاد بکرێت.</div>';
@@ -534,71 +509,7 @@
   $('statRegCard').addEventListener('click', ()=>openReport());
   $('closeReportBtn').addEventListener('click', ()=>$('reportModal').classList.remove('show'));
   $('reportModal').addEventListener('click', e=>{ if(e.target===$('reportModal')) $('reportModal').classList.remove('show'); });
-  function printSelectedCity(){
-    if(!selectedCity){
-      showToast('تکایە یەکەم شارێک هەڵبژێرە');
-      return;
-    }
-
-    const area = $('printArea');
-    if(!area){
-      showToast('بەشی پرێنت نەدۆزرایەوە');
-      return;
-    }
-
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    if(!printWindow){
-      showToast('ڕێگە بە پەنجەرەی پرێنت بدە (Pop-up)');
-      return;
-    }
-
-    printWindow.document.open();
-    printWindow.document.write(
-      '<!DOCTYPE html><html dir="rtl" lang="ckb"><head>' +
-      '<meta charset="UTF-8">' +
-      '<title>' + selectedCity + ' - لیستی تۆمارکراوان</title>' +
-      '<style>' +
-      '@font-face{font-family:Rabar;src:local("Rabar 022"),local("Rabar_022"),local("Rabar");}' +
-      'body{font-family:Rabar,Tahoma,Arial,sans-serif;direction:rtl;color:#111;padding:24px;}' +
-      'h2{text-align:center;margin:0 0 10px;}' +
-      '.hint{text-align:center;margin-bottom:16px;}' +
-      'table{width:100%;border-collapse:collapse;font-size:14px;}' +
-      'th,td{border:1px solid #222;padding:9px 7px;text-align:right;}' +
-      'th{font-weight:700;background:#f2f2f2;}' +
-      '@page{size:auto;margin:12mm;}' +
-      '@media print{body{padding:0;}}' +
-      '
-  /* Notification for successful check-in */
-  .toast-notification{
-    position:fixed;
-    top:20px;
-    left:50%;
-    transform:translateX(-50%) translateY(-120px);
-    background:#16a34a;
-    color:#fff;
-    padding:15px 28px;
-    border-radius:12px;
-    font-size:20px;
-    font-weight:700;
-    z-index:999999;
-    opacity:0;
-    box-shadow:0 8px 25px rgba(0,0,0,.22);
-    transition:all .35s ease;
-    pointer-events:none;
-  }
-  .toast-notification.show{
-    transform:translateX(-50%) translateY(0);
-    opacity:1;
-  }
-</style></head><body>' +
-      area.innerHTML +
-      '<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},300);};window.onafterprint=function(){window.close();};<\/script>' +
-      '</body></html>'
-    );
-    printWindow.document.close();
-  }
-
-  $('printCityBtn').addEventListener('click', printSelectedCity);
+  $('printCityBtn').addEventListener('click', ()=>{ if(selectedCity) window.print(); else showToast('تکایە یەکەم شارێک هەڵبژێرە'); });
 
   async function refreshStats(){
     try{
