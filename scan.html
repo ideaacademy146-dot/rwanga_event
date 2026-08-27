@@ -164,8 +164,14 @@
 
   async function callApi(params){
     const url = CONFIG.SCRIPT_URL + '?' + new URLSearchParams(params).toString();
-    const res = await fetch(url);
-    return res.json();
+    const res = await fetch(url, { method:'GET', cache:'no-store' });
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      console.error('API did not return JSON:', text);
+      throw new Error('Google Apps Script JSON نەگەڕاندەوە. دڵنیابە Web App ـەکە Deploy/Update کراوە و Access = Anyone ـە.');
+    }
   }
 
   function adminKey(){ return sessionStorage.getItem('adminKey') || ''; }
@@ -310,6 +316,7 @@
   async function refreshStats(){
     try{
       const r = await callApi({ action:'stats', adminKey: adminKey() });
+      if(!r.success) throw new Error(r.error || 'stats_failed');
       const regCount = r.total || 0;
       const inCount = r.checkedIn || 0;
       $('statReg').textContent = regCount;
@@ -317,8 +324,59 @@
       const pct = regCount ? Math.round((inCount/regCount)*100) : 0;
       $('barFill').style.width = pct + '%';
       $('barLabel').textContent = '٪' + pct + ' چوونەژوورەوە';
-    }catch(e){}
+    }catch(e){
+      console.error(e);
+    }
   }
+
+  // ---- report ----
+  async function loadReport(){
+    const city = $('cityFilter').value || 'all';
+    const body = $('reportBody');
+    body.innerHTML = '<tr><td colspan="10" style="text-align:center">تکایە چاوەڕێ بکە...</td></tr>';
+    $('reportCard').hidden = false;
+    $('printTitle').textContent = city === 'all' ? 'راپۆرتی هەموو قوتابیەکان' : 'راپۆرتی قوتابیانی ' + city;
+    try{
+      const r = await callApi({ action:'report', adminKey: adminKey(), city });
+      if(!r.success) throw new Error(r.error || 'report_failed');
+      if(!r.rows || !r.rows.length){
+        body.innerHTML = '<tr><td colspan="10" style="text-align:center">هیچ قوتابییەک نەدۆزرایەوە.</td></tr>';
+        return;
+      }
+      body.innerHTML = r.rows.map((x,i)=>{
+        const status = x.checkedIn ? '✅ داخل بووە' : '⏳ هێشتا نەهاتووە';
+        return `<tr>
+          <td>${i+1}</td>
+          <td>${esc(x.name)}</td>
+          <td>${esc(x.school)}</td>
+          <td>${esc(x.city)}</td>
+          <td>${esc(x.branch)}</td>
+          <td>${esc(x.score)}</td>
+          <td>${esc(x.favorite)}</td>
+          <td>${esc(x.expectedGift)}</td>
+          <td>${status}</td>
+          <td>${esc(x.checkinTime || '-')}</td>
+        </tr>`;
+      }).join('');
+    }catch(e){
+      body.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#d64545">❌ ${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  function esc(v){
+    return String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  $('reportBtn').addEventListener('click', loadReport);
+  $('cityFilter').addEventListener('change', loadReport);
+  $('refreshBtn').addEventListener('click', ()=>{
+    refreshStats();
+    if(!$('tab-dashboard').hidden) loadReport();
+  });
+  $('printBtn').addEventListener('click', async ()=>{
+    if($('reportCard').hidden) await loadReport();
+    setTimeout(()=>window.print(), 150);
+  });
 </script>
 </body>
 </html>
