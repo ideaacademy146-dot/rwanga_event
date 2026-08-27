@@ -75,6 +75,21 @@
   footer{ text-align:center; font-size:12px; color:#7d95b5; margin-top:26px; }
   .logout{ text-align:center; margin-top:8px; }
   .logout a{ color:#a9c1de; font-size:12.5px; cursor:pointer; text-decoration:underline; }
+
+  .names-table{ width:100%; border-collapse:collapse; margin-top:14px; font-size:14px; }
+  .names-table th, .names-table td{ border:1px solid #dbe6f3; padding:8px 10px; text-align:right; }
+  .names-table th{ background:#f2f6fb; color:var(--navy-800); }
+  .names-table tr:nth-child(even) td{ background:#fafcff; }
+  .print-title{ display:none; }
+
+  @media print{
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{ position:absolute; inset:0; margin:0; padding:20px; }
+    .print-title{ display:block; font-size:18px; font-weight:800; color:#000; margin-bottom:12px; text-align:center; }
+    .names-table th, .names-table td{ border-color:#333; color:#000; }
+    .names-table th{ background:#eee !important; -webkit-print-color-adjust:exact; }
+  }
 </style>
 </head>
 <body>
@@ -154,6 +169,22 @@
         <button class="secondary" id="refreshBtn">نوێکردنەوە</button>
         <button class="secondary" id="reportBtn">داگرتنی ڕاپۆرت (CSV)</button>
         <div class="hint" id="reportHint" style="text-align:center;margin-top:6px;"></div>
+      </div>
+
+      <div class="card" style="margin-top:14px;" id="namesCard">
+        <h2 style="margin-bottom:8px;">لیستی ناوەکان</h2>
+        <button class="secondary" id="showNamesBtn">پیشاندانی ناوەکان</button>
+        <button class="secondary" id="printNamesBtn" hidden>پرینتکردن</button>
+        <div class="hint" id="namesHint" style="text-align:center;margin-top:6px;"></div>
+        <div id="printArea" hidden>
+          <div class="print-title" id="printTitle"></div>
+          <table class="names-table" id="namesTable">
+            <thead>
+              <tr><th>#</th><th>ناو</th><th>ئامادەیی</th><th>چوونەژوورەوە</th></tr>
+            </thead>
+            <tbody id="namesTbody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -517,6 +548,48 @@
     }
   }
   $('reportBtn').addEventListener('click',downloadReport);
+
+  // ---------- names list (view + print) ----------
+  async function showNames(){
+    $('showNamesBtn').disabled=true;
+    $('namesHint').textContent='چاوەڕێ بە، ناوەکان بار دەکرێن...';
+    try{
+      const city=$('citySelect').value;
+      const r=await callApi({action:'report',city,adminKey:adminKey()});
+      if(!r.success){
+        $('namesHint').textContent='هەڵە: '+(r.error||'نەزانراو');
+        return;
+      }
+      const tbody=$('namesTbody');
+      tbody.innerHTML='';
+      r.records.forEach((rec,i)=>{
+        const tr=document.createElement('tr');
+        const cells=[
+          i+1,
+          rec.fullName||'',
+          rec.school||'',
+          rec.checkedIn?'بەڵێ':'نەخێر'
+        ];
+        cells.forEach(val=>{
+          const td=document.createElement('td');
+          td.textContent=val;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      $('printTitle').textContent='لیستی ناوەکان'+(city?(' — '+city):'')+' ('+r.records.length+' کەس)';
+      $('printArea').hidden=false;
+      $('printNamesBtn').hidden=false;
+      $('namesHint').textContent=r.records.length+' ناو دۆزرایەوە.';
+    }catch(e){
+      console.error(e);
+      $('namesHint').textContent='پەیوەندی بە سیستەمەکەوە نەکرا.';
+    }finally{
+      $('showNamesBtn').disabled=false;
+    }
+  }
+  $('showNamesBtn').addEventListener('click',showNames);
+  $('printNamesBtn').addEventListener('click',()=>window.print());
 </script>
 </body>
 </html>
