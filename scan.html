@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>ئیڤینتی ئاراستەی زانکۆ - سکانکردن (ئەدمین)</title>
+<title>ئیڤێنتی ئاراستەی زانکۆ - سکانکردن (ئەدمین)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
 <style>
@@ -180,7 +180,7 @@
           <div class="print-title" id="printTitle"></div>
           <table class="names-table" id="namesTable">
             <thead>
-              <tr><th>#</th><th>ناو</th><th>ئامادەیی</th><th>چوونەژوورەوە</th></tr>
+              <tr><th>#</th><th>ناو</th><th>قوتابخانە</th><th>چوونەژوورەوە</th></tr>
             </thead>
             <tbody id="namesTbody"></tbody>
           </table>
@@ -526,7 +526,7 @@
         $('reportHint').textContent='هەڵە: '+(r.error||'نەزانراو');
         return;
       }
-      const headers=['ID','ناوی سیانی','تەمەن','ئامادەیی','مۆبایل','لق','ڕەگەز','نمرە','شار','دڵخواز','دیاری چاوەڕوانکراو','چوونەژوورەوە','کاتی چوونەژوورەوە'];
+      const headers=['ID','ناوی سیانی','تەمەن','قوتابخانە','مۆبایل','لق','ڕەگەز','نمرە','شار','دڵخواز','دیاری چاوەڕوانکراو','چوونەژوورەوە','کاتی چوونەژوورەوە'];
       const rows=r.records.map(rec=>[
         rec.id,rec.fullName,rec.age,rec.school,rec.phone,rec.branch,rec.gender,rec.score,
         rec.city,rec.favorite,rec.giftExpectation,(rec.checkedIn?'بەڵێ':'نەخێر'),rec.checkinTime
