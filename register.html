@@ -91,7 +91,7 @@
         <input type="text" id="fullName" required>
 
         <label>تەمەن *</label>
-        <input type="number" id="age" min="10" max="30" required>
+        <input type="number" id="age" min="0" required>
 
         <label>ژمارە قوتابیان وە ئەندامانی خێزان و هاوڕێ *</label>
         <input type="number" id="familyCount" min="0" max="10" value="0" required>
@@ -100,8 +100,21 @@
         <label>ناوی قوتابخانە *</label>
         <input type="text" id="school" required>
 
+        <label>شار *</label>
+        <select id="city" required>
+          <option value="">هەڵبژاردن...</option>
+          <option value="هەولێر">هەولێر</option>
+          <option value="ئاکرێ">ئاکرێ</option>
+          <option value="هەریر">هەریر</option>
+          <option value="رانیە">رانیە</option>
+          <option value="کەلار">کەلار</option>
+          <option value="سڵیمانی">سڵیمانی</option>
+          <option value="سۆران">سۆران</option>
+          <option value="دهۆک">دهۆک</option>
+        </select>
+
         <label>ژمارە مۆبایل *</label>
-        <input type="tel" id="phone" required>
+        <input type="text" inputmode="tel" id="phone" placeholder="٠٧٥٠xxxxxxx" required>
 
         <label>لق *</label>
         <select id="branch" required>
@@ -153,6 +166,20 @@
 
   const $ = (id) => document.getElementById(id);
 
+  // ===== گۆڕینی ژمارە عەرەبی/کوردی بۆ ئینگلیزی (بۆ ئەوەی هەردوو جۆرەکە قبوڵ بکرێت) =====
+  function toEnglishDigits(str){
+    if(str === undefined || str === null) return str;
+    const arabicIndic = '٠١٢٣٤٥٦٧٨٩';   // ئەرقامی عەرەبی
+    const extendedArabicIndic = '۰۱۲۳۴۵۶۷۸۹'; // ئەرقامی فارسی/کوردی
+    return String(str).replace(/[٠-٩۰-۹]/g, (ch) => {
+      let idx = arabicIndic.indexOf(ch);
+      if(idx !== -1) return String(idx);
+      idx = extendedArabicIndic.indexOf(ch);
+      if(idx !== -1) return String(idx);
+      return ch;
+    });
+  }
+
   async function callApi(params){
     const url = CONFIG.SCRIPT_URL + '?' + new URLSearchParams(params).toString();
     const res = await fetch(url);
@@ -165,15 +192,16 @@
     const genderEl = document.querySelector('input[name=gender]:checked');
     const record = {
       fullName: $('fullName').value.trim(),
-      age: $('age').value,
+      age: toEnglishDigits($('age').value),
       familyCount: $('familyCount').value,
       school: $('school').value.trim(),
-      phone: $('phone').value.trim(),
+      city: $('city').value,
+      phone: toEnglishDigits($('phone').value.trim()),
       branch: $('branch').value,
       gender: genderEl ? genderEl.value : '',
       score: $('score').value
     };
-    if(!record.fullName || !record.age || !record.school || !record.phone || !record.branch || !record.gender || record.score===''){
+    if(!record.fullName || !record.age || !record.school || !record.city || !record.phone || !record.branch || !record.gender || record.score===''){
       $('formError').textContent = 'تکایە هەموو خانە پێویستەکان پڕبکەرەوە.';
       $('formError').style.display = 'block';
       return;
