@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>ئیڤینتی ئاراستەی زانکۆ - سکانکردن (ئەدمین)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
 <style>
   :root{
     --navy-900:#081b34; --navy-800:#0c2748; --navy-600:#164a86; --navy-500:#1d5fa8;
@@ -147,283 +148,318 @@
 </div>
 
 <script>
-  // ===== پێش بڵاوکردنەوە، ئەم URLـە بگۆڕە بە URLـی Apps Script Web App ـی خۆت =====
+  // ===== Apps Script Web App =====
   const CONFIG = { SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbz7uZ89KeNvWA8JAzLLzI4Rnm4BCFIHdL_nMVV-UXVZN8eTUa3WkT1zJgqqpFFqSv-l/exec' };
-
   const $ = (id) => document.getElementById(id);
 
   async function callApi(params){
     const url = CONFIG.SCRIPT_URL + '?' + new URLSearchParams(params).toString();
-    const res = await fetch(url);
-    return res.json();
+    const res = await fetch(url, { cache:'no-store' });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const text = await res.text();
+    try { return JSON.parse(text); }
+    catch(e){ throw new Error('API did not return JSON'); }
   }
 
   function adminKey(){ return sessionStorage.getItem('adminKey') || ''; }
 
-  // ---- gate ----
+  // ---------- login ----------
   $('gateBtn').addEventListener('click', doGate);
-  $('passcode').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); doGate(); } });
+  $('passcode').addEventListener('keydown', e=>{ if(e.key==='Enter'){e.preventDefault();doGate();} });
 
   async function doGate(){
-    const key = $('passcode').value.trim();
-    $('gateError').style.display = 'none';
+    const key=$('passcode').value.trim();
+    $('gateError').style.display='none';
     if(!key) return;
-    $('gateBtn').disabled = true;
+    $('gateBtn').disabled=true;
     try{
-      const r = await callApi({ action:'verifyAdmin', key });
+      const r=await callApi({action:'verifyAdmin',key});
       if(r.success){
-        sessionStorage.setItem('adminKey', key);
-        $('gate').hidden = true;
-        $('app').hidden = false;
+        sessionStorage.setItem('adminKey',key);
+        $('gate').hidden=true;
+        $('app').hidden=false;
         refreshStats();
-      } else {
-        $('gateError').textContent = 'کۆدی نهێنی هەڵەیە.';
-        $('gateError').style.display = 'block';
+      }else{
+        $('gateError').textContent='کۆدی نهێنی هەڵەیە.';
+        $('gateError').style.display='block';
       }
     }catch(e){
-      $('gateError').textContent = 'نەتوانرا پەیوەندی بکرێت. تۆڕی ئینتەرنێت بپشکنە.';
-      $('gateError').style.display = 'block';
-    }finally{
-      $('gateBtn').disabled = false;
-    }
+      $('gateError').textContent='نەتوانرا پەیوەندی بکرێت. تۆڕی ئینتەرنێت بپشکنە.';
+      $('gateError').style.display='block';
+    }finally{$('gateBtn').disabled=false;}
   }
 
-  // resume session if already verified this browser session
   if(sessionStorage.getItem('adminKey')){
-    $('gate').hidden = true;
-    $('app').hidden = false;
+    $('gate').hidden=true;
+    $('app').hidden=false;
     refreshStats();
   }
 
-  $('logoutLink').addEventListener('click', ()=>{
+  $('logoutLink').addEventListener('click',()=>{
+    stopCamera();
     sessionStorage.removeItem('adminKey');
     location.reload();
   });
 
-  // ---- tabs ----
+  // ---------- tabs ----------
   document.querySelectorAll('nav.tabs button').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click',()=>{
       document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
-      $('tab-scan').hidden = (btn.dataset.tab !== 'scan');
-      $('tab-dashboard').hidden = (btn.dataset.tab !== 'dashboard');
-      if(btn.dataset.tab === 'dashboard') refreshStats();
+      $('tab-scan').hidden=btn.dataset.tab!=='scan';
+      $('tab-dashboard').hidden=btn.dataset.tab!=='dashboard';
+      if(btn.dataset.tab==='dashboard') refreshStats();
       else stopCamera();
     });
   });
 
-  // ---- scanning ----
-  let stream = null, scanning = false, videoEl = $('video');
-  let lastScanTime = 0;
-  let scanBusy = false;
+  // ---------- QR CAMERA ----------
+  // The important change: ZXing owns the continuous camera decoding.
+  // The previous implementation relied mainly on jsQR frame sampling, which
+  // was unreliable on iPhone Safari for the QR shown on another screen.
+  let scanning=false;
+  let zxingReader=null;
+  let zxingControls=null;
+  let lastDecoded='';
+  let lastDecodedAt=0;
+  let fallbackTimer=null;
+  let stream=null;
+
+  function showScanWaiting(msg='📷 کامێرا چالاکە — QR دەگەڕێین'){
+    $('resultCard').style.display='block';
+    $('resultCard').className='result-card';
+    $('resultStatus').textContent=msg;
+    $('resultName').textContent='QR ـەکە لە ناو چوارچێوەکەدا بگرە';
+    $('resultTime').textContent='';
+  }
 
   async function startCamera(){
+    if(scanning) return;
     try{
-      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-        throw new Error('camera_not_supported');
+      showScanWaiting();
+      $('startScanBtn').disabled=true;
+      $('startScanBtn').textContent='چاوەڕێی کامێرا...';
+
+      // Prefer ZXing. It continuously decodes from the actual video element.
+      if(window.ZXingBrowser && window.ZXingBrowser.BrowserQRCodeReader){
+        zxingReader = new ZXingBrowser.BrowserQRCodeReader();
+        const constraints={
+          video:{
+            facingMode:{ideal:'environment'},
+            width:{ideal:1280},
+            height:{ideal:720}
+          },
+          audio:false
+        };
+        zxingControls = await zxingReader.decodeFromConstraints(
+          constraints,
+          $('video'),
+          (result, error)=>{
+            if(!scanning) return;
+            if(result && result.getText){
+              const code=String(result.getText()).trim();
+              if(code) acceptDetectedCode(code);
+            }
+          }
+        );
+
+        // Apply autofocus to the stream ZXing attached to the video element.
+        try{
+          const tracks=$('video').srcObject ? $('video').srcObject.getVideoTracks() : [];
+          if(tracks.length){
+            stream=$('video').srcObject;
+            const track=tracks[0];
+            const caps=track.getCapabilities ? track.getCapabilities() : {};
+            if(caps.focusMode && caps.focusMode.includes('continuous')){
+              await track.applyConstraints({advanced:[{focusMode:'continuous'}]});
+            }
+          }
+        }catch(_e){}
+
+        scanning=true;
+        $('startScanBtn').disabled=false;
+        $('startScanBtn').textContent='داخستنی کامێرا';
+        return;
       }
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30, max: 30 }
-        }
-      });
-      videoEl.srcObject = stream;
-      videoEl.setAttribute('playsinline','true');
-      videoEl.muted = true;
-      await videoEl.play();
 
-      try{
-        if('BarcodeDetector' in window){
-          const formats = await BarcodeDetector.getSupportedFormats();
-          if(formats.includes('qr_code')) barcodeDetector = new BarcodeDetector({formats:['qr_code']});
-        }
-      }catch(e){ barcodeDetector = null; }
-
-      // Try to enable continuous autofocus on phones that support it.
-      try{
-        const track = stream.getVideoTracks()[0];
-        const caps = track.getCapabilities ? track.getCapabilities() : {};
-        if(caps.focusMode && caps.focusMode.includes('continuous')){
-          await track.applyConstraints({advanced:[{focusMode:'continuous'}]});
-        }
-      }catch(_e){}
-
-      scanning = true;
-      $('startScanBtn').textContent = 'داخستنی کامێرا';
-      $('resultCard').style.display = 'block';
-      $('resultCard').className = 'result-card';
-      $('resultStatus').textContent = '📷 کامێرا چالاکە — QR دەگەڕێین';
-      $('resultName').textContent = 'QR ـەکە لە ناو چوارچێوەکەدا بگرە';
-      $('resultTime').textContent = '';
-      requestAnimationFrame(scanLoop);
+      // Fallback if the ZXing CDN is unavailable.
+      await startJsQRFallback();
     }catch(err){
-      console.error(err);
-      scanning = false;
-      alert('نەتوانرا کامێرا بکرێتەوە. تکایە ڕێگەی کامێرا بدە و دووبارە هەوڵ بدە.');
+      console.error('camera start failed',err);
+      scanning=false;
+      $('startScanBtn').disabled=false;
+      $('startScanBtn').textContent='کردنەوەی کامێرا';
+      $('resultCard').style.display='block';
+      $('resultCard').className='result-card bad';
+      $('resultStatus').textContent='❌ کامێرا نەکراوەتەوە';
+      $('resultName').textContent='';
+      $('resultTime').textContent='ڕێگەی کامێرا بدە و دووبارە هەوڵ بدە.';
     }
+  }
+
+  async function startJsQRFallback(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('camera_not_supported');
+    stream=await navigator.mediaDevices.getUserMedia({
+      audio:false,
+      video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
+    });
+    const video=$('video');
+    video.srcObject=stream;
+    video.setAttribute('playsinline','true');
+    video.muted=true;
+    await video.play();
+    try{
+      const track=stream.getVideoTracks()[0];
+      const caps=track.getCapabilities ? track.getCapabilities() : {};
+      if(caps.focusMode && caps.focusMode.includes('continuous')) await track.applyConstraints({advanced:[{focusMode:'continuous'}]});
+    }catch(_e){}
+    scanning=true;
+    $('startScanBtn').disabled=false;
+    $('startScanBtn').textContent='داخستنی کامێرا';
+    fallbackTimer=setInterval(()=>{
+      if(scanning) decodeFallbackFrame();
+    },120);
+  }
+
+  const fallbackCanvas=document.createElement('canvas');
+  const fallbackCtx=fallbackCanvas.getContext('2d',{willReadFrequently:true});
+
+  function decodeFallbackFrame(){
+    const video=$('video');
+    if(!video.videoWidth || !video.videoHeight || !window.jsQR) return;
+    const vw=video.videoWidth, vh=video.videoHeight;
+    const scale=Math.min(1,1600/vw);
+    const w=Math.round(vw*scale), h=Math.round(vh*scale);
+    fallbackCanvas.width=w; fallbackCanvas.height=h;
+    fallbackCtx.imageSmoothingEnabled=false;
+    fallbackCtx.drawImage(video,0,0,w,h);
+
+    let image=fallbackCtx.getImageData(0,0,w,h);
+    let code=jsQR(image.data,w,h,{inversionAttempts:'attemptBoth'});
+    if(code && code.data){acceptDetectedCode(code.data);return;}
+
+    // Center crop, enlarged 2.5x. The registration QR occupies the center.
+    const cw=Math.floor(w*0.72), ch=Math.floor(h*0.72);
+    const sx=Math.floor((w-cw)/2), sy=Math.floor((h-ch)/2);
+    const z=document.createElement('canvas');
+    z.width=Math.min(1600,Math.round(cw*2.5));
+    z.height=Math.min(1600,Math.round(ch*2.5));
+    const zc=z.getContext('2d',{willReadFrequently:true});
+    zc.imageSmoothingEnabled=false;
+    zc.drawImage(fallbackCanvas,sx,sy,cw,ch,0,0,z.width,z.height);
+    image=zc.getImageData(0,0,z.width,z.height);
+    code=jsQR(image.data,z.width,z.height,{inversionAttempts:'attemptBoth'});
+    if(code && code.data){acceptDetectedCode(code.data);return;}
+
+    // High contrast pass.
+    const d=image.data;
+    for(let i=0;i<d.length;i+=4){
+      const y=(d[i]*299+d[i+1]*587+d[i+2]*114)/1000;
+      const v=y<160?0:255;
+      d[i]=d[i+1]=d[i+2]=v;
+    }
+    code=jsQR(d,image.width,image.height,{inversionAttempts:'attemptBoth'});
+    if(code && code.data) acceptDetectedCode(code.data);
+  }
+
+  function acceptDetectedCode(code){
+    code=String(code||'').trim().toUpperCase();
+    if(!code) return;
+    const now=Date.now();
+    if(code===lastDecoded && now-lastDecodedAt<3000) return;
+    lastDecoded=code;
+    lastDecodedAt=now;
+    if(navigator.vibrate) navigator.vibrate(100);
+    handleCode(code);
   }
 
   function stopCamera(){
-    scanning = false;
-    if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
-    $('startScanBtn').textContent = 'کردنەوەی کامێرا';
+    scanning=false;
+    if(zxingControls){
+      try{zxingControls.stop();}catch(_e){}
+      zxingControls=null;
+    }
+    if(zxingReader){
+      try{zxingReader.reset();}catch(_e){}
+      zxingReader=null;
+    }
+    if(fallbackTimer){clearInterval(fallbackTimer);fallbackTimer=null;}
+    if(stream){try{stream.getTracks().forEach(t=>t.stop());}catch(_e){} stream=null;}
+    const v=$('video');
+    try{v.pause();}catch(_e){}
+    v.srcObject=null;
+    $('startScanBtn').disabled=false;
+    $('startScanBtn').textContent='کردنەوەی کامێرا';
   }
 
-  $('startScanBtn').addEventListener('click', ()=>{
-    if(scanning) stopCamera();
-    else startCamera();
+  $('startScanBtn').addEventListener('click',()=>{
+    if(scanning) stopCamera(); else startCamera();
   });
 
-  // ---- robust QR scanning ----
-  const scanCanvas = document.createElement('canvas');
-  const scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
-  let barcodeDetector = null;
-  let lastFrameAt = 0;
-  let scanTimer = null;
-
-  // Native BarcodeDetector is initialized when the camera starts.
-
-  async function tryNativeDecode(){
-    if(!barcodeDetector || !videoEl.videoWidth) return null;
-    try{
-      const found = await barcodeDetector.detect(videoEl);
-      if(found && found.length){
-        for(const item of found){
-          if(item.rawValue) return item.rawValue;
-        }
-      }
-    }catch(e){}
-    return null;
-  }
-
-  function decodeJsQR(canvas, ctx){
-    const w = canvas.width, h = canvas.height;
-    if(!w || !h) return null;
-
-    // Pass 1: original frame.
-    let img = ctx.getImageData(0,0,w,h);
-    let code = jsQR(img.data,w,h,{inversionAttempts:'attemptBoth'});
-    if(code && code.data) return code.data;
-
-    // Pass 2: enlarge the center region. This is important on phones when the
-    // QR is displayed on another screen and occupies only part of the camera frame.
-    const cw = Math.floor(w * 0.62), ch = Math.floor(h * 0.62);
-    const sx = Math.max(0, Math.floor((w-cw)/2));
-    const sy = Math.max(0, Math.floor((h-ch)/2));
-    const zoom = document.createElement('canvas');
-    zoom.width = Math.min(1200, cw*2);
-    zoom.height = Math.min(1200, ch*2);
-    const zctx = zoom.getContext('2d',{willReadFrequently:true});
-    zctx.imageSmoothingEnabled = false;
-    zctx.drawImage(canvas,sx,sy,cw,ch,0,0,zoom.width,zoom.height);
-    img = zctx.getImageData(0,0,zoom.width,zoom.height);
-    code = jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
-    if(code && code.data) return code.data;
-
-    // Pass 3: high-contrast grayscale/threshold version.
-    const d = img.data;
-    for(let i=0;i<d.length;i+=4){
-      const y = (d[i]*299 + d[i+1]*587 + d[i+2]*114)/1000;
-      const v = y < 150 ? 0 : 255;
-      d[i]=d[i+1]=d[i+2]=v;
-    }
-    code = jsQR(d,img.width,img.height,{inversionAttempts:'attemptBoth'});
-    return code && code.data ? code.data : null;
-  }
-
-  async function decodeCurrentFrame(){
-    const native = await tryNativeDecode();
-    if(native) return native;
-
-    const vw=videoEl.videoWidth, vh=videoEl.videoHeight;
-    if(!vw || !vh) return null;
-    const maxW = 1440;
-    const scale = Math.min(1,maxW/vw);
-    scanCanvas.width=Math.max(1,Math.round(vw*scale));
-    scanCanvas.height=Math.max(1,Math.round(vh*scale));
-    scanCtx.imageSmoothingEnabled=false;
-    scanCtx.drawImage(videoEl,0,0,scanCanvas.width,scanCanvas.height);
-    return decodeJsQR(scanCanvas,scanCtx);
-  }
-
-  async function scanLoop(){
-    if(!scanning) return;
-    const now=performance.now();
-    // About 5 scans/second: much lighter on iPhone Safari while still feeling instant.
-    if(!scanBusy && now-lastFrameAt>=200 && videoEl.readyState>=HTMLMediaElement.HAVE_CURRENT_DATA){
-      lastFrameAt=now;
-      scanBusy=true;
-      try{
-        const data=await decodeCurrentFrame();
-        if(data && data.trim() && Date.now()-lastScanTime>1800){
-          lastScanTime=Date.now();
-          if(navigator.vibrate) navigator.vibrate(80);
-          handleCode(data.trim());
-        }
-      }catch(e){ console.error('QR scan error',e); }
-      finally{ scanBusy=false; }
-    }
-    if(scanning) scanTimer=setTimeout(scanLoop,80);
-  }
-
+  // ---------- API/check-in ----------
   async function handleCode(code){
-    code = code.toUpperCase();
-    $('resultCard').style.display = 'block';
-    $('resultCard').className = 'result-card';
+    $('resultCard').style.display='block';
+    $('resultCard').className='result-card';
+    $('resultStatus').textContent='⏳ QR ناسراوە — داتا دەنێردرێت...';
+    $('resultName').textContent=code;
+    $('resultTime').textContent='';
     try{
-      const r = await callApi({ action:'checkin', code, adminKey: adminKey() });
+      const r=await callApi({action:'checkin',code,adminKey:adminKey()});
       if(r.success){
-        $('resultCard').className = 'result-card ok';
-        $('resultStatus').textContent = '🟢 قوتابی بە سەرکەوتوویی داخل بوو';
-        $('resultName').textContent = r.name + (r.school ? (' — ' + r.school) : '');
-        $('resultTime').textContent = new Date().toLocaleTimeString('en-GB');
-      } else if(r.error === 'already'){
-        $('resultCard').className = 'result-card warn';
-        $('resultStatus').textContent = '🟠 ئەم قوتابییە پێشتر داخل کراوە';
-        $('resultName').textContent = r.name;
-        $('resultTime').textContent = 'کاتی یەکەم چوونەژوورەوە: ' + r.time;
-      } else if(r.error === 'unauthorized'){
-        $('resultCard').className = 'result-card bad';
-        $('resultStatus').textContent = '🔒 کۆدی ئەدمین نادروستە';
-        $('resultName').textContent = '';
-        $('resultTime').textContent = 'دووبارە بچۆرەوە ژوورەوە.';
-      } else {
-        $('resultCard').className = 'result-card bad';
-        $('resultStatus').textContent = '❌ ئەم کۆدە تۆمار نەکراوە';
-        $('resultName').textContent = code;
-        $('resultTime').textContent = '';
+        $('resultCard').className='result-card ok';
+        $('resultStatus').textContent='🟢 قوتابی بە سەرکەوتوویی داخل بوو';
+        $('resultName').textContent=(r.name||'')+(r.school?(' — '+r.school):'')+(r.city?(' — '+r.city):'');
+        $('resultTime').textContent='کاتی چوونەژوورەوە: '+(r.time||new Date().toLocaleTimeString('en-GB'));
+        refreshStats();
+      }else if(r.error==='already'){
+        $('resultCard').className='result-card warn';
+        $('resultStatus').textContent='🟠 ئەم قوتابییە پێشتر داخل کراوە';
+        $('resultName').textContent=r.name||code;
+        $('resultTime').textContent='کاتی یەکەم چوونەژوورەوە: '+(r.time||'-');
+      }else if(r.error==='unauthorized'){
+        $('resultCard').className='result-card bad';
+        $('resultStatus').textContent='🔒 کۆدی ئەدمین نادروستە';
+        $('resultName').textContent='';
+        $('resultTime').textContent='دووبارە بچۆرەوە ژوورەوە.';
+      }else if(r.error==='not_found'){
+        $('resultCard').className='result-card bad';
+        $('resultStatus').textContent='❌ ئەم کۆدە لە لیستی قوتابیان نییە';
+        $('resultName').textContent=code;
+        $('resultTime').textContent='';
+      }else{
+        $('resultCard').className='result-card bad';
+        $('resultStatus').textContent='❌ هەڵەیەک ڕوویدا';
+        $('resultName').textContent='';
+        $('resultTime').textContent=r.error||'نەزانراو';
       }
     }catch(e){
-      $('resultCard').className = 'result-card bad';
-      $('resultStatus').textContent = '❌ هەڵەیەک ڕوویدا';
-      $('resultName').textContent = '';
-      $('resultTime').textContent = 'تۆڕی ئینتەرنێت بپشکنە';
+      console.error(e);
+      $('resultCard').className='result-card bad';
+      $('resultStatus').textContent='❌ پەیوەندی بە سیستەمەکەوە نەکرا';
+      $('resultName').textContent='';
+      $('resultTime').textContent='تۆڕی ئینتەرنێت یان Web App بپشکنە.';
     }
   }
 
-  $('manualBtn').addEventListener('click', ()=>{
-    const v = $('manualCode').value.trim();
-    if(v) handleCode(v);
+  $('manualBtn').addEventListener('click',()=>{
+    const v=$('manualCode').value.trim();
+    if(v) acceptDetectedCode(v);
   });
-  $('manualCode').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); $('manualBtn').click(); } });
+  $('manualCode').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('manualBtn').click();}});
 
-  // ---- dashboard ----
+  // ---------- dashboard ----------
   async function refreshStats(){
     try{
-      const r = await callApi({ action:'stats' });
-      const regCount = r.total || 0;
-      const inCount = r.checkedIn || 0;
-      $('statReg').textContent = regCount;
-      $('statIn').textContent = inCount;
-      const pct = regCount ? Math.round((inCount/regCount)*100) : 0;
-      $('barFill').style.width = pct + '%';
-      $('barLabel').textContent = '٪' + pct + ' چوونەژوورەوە';
-    }catch(e){}
+      const r=await callApi({action:'stats'});
+      const regCount=r.total||0, inCount=r.checkedIn||0;
+      $('statReg').textContent=regCount;
+      $('statIn').textContent=inCount;
+      const pct=regCount?Math.round((inCount/regCount)*100):0;
+      $('barFill').style.width=pct+'%';
+      $('barLabel').textContent='٪'+pct+' چوونەژوورەوە';
+    }catch(e){console.error(e);}
   }
+  $('refreshBtn').addEventListener('click',refreshStats);
 </script>
 </body>
 </html>
