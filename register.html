@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>ئیڤێنتی ئاراستەی زانکۆ - تۆمارکردن</title>
+<title>ئیڤینتی ئاراستەی زانکۆ - تۆمارکردن</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
@@ -87,12 +87,12 @@
     <div class="card">
       <h2>زانیاری بەشداربوو</h2>
       <form id="regForm">
-        <label>ناوی سیانی (تەنها بە کوردی) *</label>
+        <label>ناوی سیانی *</label>
         <input type="text" id="fullName" required inputmode="text" autocomplete="name" placeholder="نموونە: ئارام ئەحمەد عەلی">
-        <div class="hint">تەنها پیتە کوردییەکان و بۆشایی ڕێگەپێدراوە.</div>
+        <div class="hint">پیتی کوردی یان ئینگلیزی و بۆشایی ڕێگەپێدراوە.</div>
 
         <label>تەمەن *</label>
-        <input type="number" id="age" min="10" max="30" required>
+        <input type="number" id="age" required>
 
         <label>ژمارە ئەندامانی خێزانی هاوڕێ *</label>
         <input type="number" id="familyCount" min="0" max="10" value="0" required>
@@ -173,6 +173,20 @@
 
   const $ = (id) => document.getElementById(id);
 
+  // Convert Arabic-Indic (٠-٩) and Extended Arabic-Indic/Kurdish-Persian (۰-۹) digits to English digits,
+  // so it doesn't matter which keyboard/numeral system someone typed the phone number with.
+  function normalizeDigits(str){
+    const map = {
+      '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+      '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
+    };
+    return String(str||'').replace(/[٠-٩۰-۹]/g, d => map[d] || d);
+  }
+  $('phone').addEventListener('input', ()=>{
+    const converted = normalizeDigits($('phone').value);
+    if(converted !== $('phone').value) $('phone').value = converted;
+  });
+
   async function callApi(params){
     const url = CONFIG.SCRIPT_URL + '?' + new URLSearchParams(params).toString();
     const res = await fetch(url);
@@ -188,7 +202,7 @@
       age: $('age').value,
       familyCount: $('familyCount').value,
       school: $('school').value.trim(),
-      phone: $('phone').value.trim(),
+      phone: normalizeDigits($('phone').value.trim()),
       branch: $('branch').value,
       gender: genderEl ? genderEl.value : '',
       score: $('score').value,
@@ -196,14 +210,14 @@
       favorite: $('favorite').value.trim(),
       expectedGift: $('expectedGift').value.trim()
     };
-    const kurdishName = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB8A-\uFBC2\uFBD3-\uFD3D\uFD50-\uFD8F\uFE70-\uFEFC\u200C\u200D\s]+$/;
+    const kurdishName = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB8A-\uFBC2\uFBD3-\uFD3D\uFD50-\uFD8F\uFE70-\uFEFC\u200C\u200Da-zA-Z\s]+$/;
     if(!record.fullName || !record.age || !record.school || !record.city || !record.phone || !record.branch || !record.gender || record.score==='' || !record.favorite || !record.expectedGift){
       $('formError').textContent = 'تکایە هەموو خانە پێویستەکان پڕبکەرەوە.';
       $('formError').style.display = 'block';
       return;
     }
     if(!kurdishName.test(record.fullName)){
-      $('formError').textContent = 'ناوی سیانی تەنها دەبێت بە پیتی کوردی بنووسرێت.';
+      $('formError').textContent = 'ناوی سیانی دەبێت تەنها بە پیتی کوردی یان ئینگلیزی بنووسرێت.';
       $('formError').style.display = 'block';
       return;
     }
