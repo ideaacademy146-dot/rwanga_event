@@ -88,7 +88,7 @@
       <h2>زانیاری بەشداربوو</h2>
       <form id="regForm">
         <label>ناوی سیانی (تەنها بە کوردی) *</label>
-        <input type="text" id="fullName" required dir="rtl" autocomplete="name">
+        <input type="text" id="fullName" required inputmode="text" autocomplete="name" placeholder="نموونە: ئارام ئەحمەد عەلی">
         <div class="hint">تەنها پیتە کوردییەکان و بۆشایی ڕێگەپێدراوە.</div>
 
         <label>تەمەن *</label>
@@ -102,7 +102,17 @@
         <input type="text" id="school" required>
 
         <label>شار *</label>
-        <input type="text" id="city" required>
+        <select id="city" required>
+          <option value="">هەڵبژاردن...</option>
+          <option value="هەولێر">هەولێر</option>
+          <option value="ئاکرێ">ئاکرێ</option>
+          <option value="هەریر">هەریر</option>
+          <option value="رانیە">رانیە</option>
+          <option value="کەلار">کەلار</option>
+          <option value="سڵیمانی">سڵیمانی</option>
+          <option value="سۆران">سۆران</option>
+          <option value="دهۆک">دهۆک</option>
+        </select>
 
         <label>ژمارە مۆبایل *</label>
         <input type="tel" id="phone" required>
@@ -124,11 +134,11 @@
         <label>کۆنمرە *</label>
         <input type="number" id="score" step="0.01" min="0" required>
 
-        <label>بەشی دڵخوازت چییە؟ *</label>
-        <input type="text" id="favorite" required>
+        <label>دڵخوازت چییە؟ *</label>
+        <input type="text" id="favorite" required placeholder="بۆ نموونە: کتێب، وەرزش، تەکنەلۆجیا...">
 
-        <label>چاوەڕێ دەکەیت دەزگای روانگە چ دیارییەکت پێشکەش بکات؟</label>
-        <input type="text" id="giftExpectation">
+        <label>چاوەڕێ دەکەیت دەزگای روانگە چ دیارییەکت پێشکەش بکات؟ *</label>
+        <input type="text" id="expectedGift" required>
 
         <div class="error-box" id="formError"></div>
         <button type="submit" class="primary" id="submitBtn">تۆمارکردن و وەرگرتنی QR</button>
@@ -182,21 +192,18 @@
       branch: $('branch').value,
       gender: genderEl ? genderEl.value : '',
       score: $('score').value,
-      city: $('city').value.trim(),
+      city: $('city').value,
       favorite: $('favorite').value.trim(),
-      giftExpectation: $('giftExpectation').value.trim()
+      expectedGift: $('expectedGift').value.trim()
     };
-
-    // ناوی سیانی تەنها پیتەکانی سکریپتی عەرەبی/کوردی + بۆشایی
-    const kurdishNamePattern = /^[\u0600-\u06FF\u0750-\u077F\s]+$/u;
-    if(!kurdishNamePattern.test(record.fullName)){
-      $('formError').textContent = 'ناوی سیانی تەنها بە پیتە کوردییەکان بنووسە؛ پیتە لاتینی و ژمارە ڕێگەپێدراو نییە.';
+    const kurdishName = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB8A-\uFBC2\uFBD3-\uFD3D\uFD50-\uFD8F\uFE70-\uFEFC\u200C\u200D\s]+$/;
+    if(!record.fullName || !record.age || !record.school || !record.city || !record.phone || !record.branch || !record.gender || record.score==='' || !record.favorite || !record.expectedGift){
+      $('formError').textContent = 'تکایە هەموو خانە پێویستەکان پڕبکەرەوە.';
       $('formError').style.display = 'block';
       return;
     }
-
-    if(!record.fullName || !record.age || !record.school || !record.city || !record.phone || !record.branch || !record.gender || record.score==='' || !record.favorite){
-      $('formError').textContent = 'تکایە هەموو خانە پێویستەکان پڕبکەرەوە.';
+    if(!kurdishName.test(record.fullName)){
+      $('formError').textContent = 'ناوی سیانی تەنها دەبێت بە پیتی کوردی بنووسرێت.';
       $('formError').style.display = 'block';
       return;
     }
