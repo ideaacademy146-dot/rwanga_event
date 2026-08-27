@@ -107,6 +107,27 @@
     opacity:1;
   }
 
+
+  .clickable-stat{ cursor:pointer; }
+  .clickable-stat:hover{ transform:translateY(-1px); }
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(8,24,48,.72); display:none; align-items:center; justify-content:center; padding:18px; z-index:50; }
+  .modal-backdrop.show{ display:flex; }
+  .modal{ width:min(760px,100%); max-height:90vh; overflow:auto; background:#fff; color:var(--ink); border-radius:18px; padding:18px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+  .modal-head{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+  .modal-head h2{ margin:0; }
+  .close-btn{ width:auto; padding:8px 12px; border:0; border-radius:10px; cursor:pointer; background:#eef3f9; color:var(--ink); font-weight:700; }
+  .city-picks{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .city-pick{ border:1px solid #d7e2ef; background:#f8fbff; border-radius:10px; padding:9px 12px; cursor:pointer; font-weight:700; }
+  .city-pick.active{ background:var(--teal); border-color:var(--teal); color:var(--navy-900); }
+  .report-table{ width:100%; border-collapse:collapse; font-size:13px; }
+  .report-table th,.report-table td{ border-bottom:1px solid #e6edf5; padding:10px 8px; text-align:right; }
+  .report-table th{ background:#f5f8fc; position:sticky; top:0; }
+  .report-actions{ display:flex; gap:8px; margin-top:14px; }
+  .report-actions button{ flex:1; }
+  .toast{ position:fixed; top:18px; left:50%; transform:translate(-50%,-20px); background:#1f8f7f; color:#fff; padding:13px 20px; border-radius:14px; font-weight:800; box-shadow:0 10px 30px rgba(0,0,0,.22); opacity:0; pointer-events:none; transition:.25s; z-index:70; }
+  .toast.show{ opacity:1; transform:translate(-50%,0); }
+  @media print{ body{ background:#fff !important; color:#000 !important; } body *{ visibility:hidden !important; } #printArea,#printArea *{ visibility:visible !important; } #printArea{ position:absolute; inset:0; width:100%; padding:12mm; } .no-print{ display:none !important; } }
+
 </style>
 </head>
 <body>
@@ -164,7 +185,7 @@
 
     <div id="tab-dashboard" hidden>
       <div class="stat-grid">
-        <div class="stat"><div class="num" id="statReg">0</div><div class="lbl">تۆمارکراو</div></div>
+        <div class="stat clickable-stat" id="statRegCard" title="کلیک بکە بۆ لیستی شارەکان"><div class="num" id="statReg">0</div><div class="lbl">تۆمارکراو — کلیک بۆ لیستی شارەکان</div></div>
         <div class="stat"><div class="num" id="statIn">0</div><div class="lbl">چوونەژوورەوە</div></div>
       </div>
       <div class="card" style="margin-top:14px;">
@@ -177,6 +198,20 @@
         <div class="city-list" id="cityList"></div>
       </div>
     </div>
+
+    <div class="modal-backdrop" id="reportModal">
+      <div class="modal">
+        <div class="modal-head no-print"><h2>لیستی تۆمارکراوان بە پێی شار</h2><button class="close-btn" id="closeReportBtn">داخستن</button></div>
+        <div class="city-picks no-print" id="cityPicks"></div>
+        <div id="printArea">
+          <h2 id="reportTitle" style="margin:0 0 10px;">لیستی تۆمارکراوان</h2>
+          <div id="reportInfo" class="hint" style="margin-bottom:10px;"></div>
+          <div id="reportBody" class="hint">شارێک هەڵبژێرە</div>
+        </div>
+        <div class="report-actions no-print"><button class="secondary" id="printCityBtn">پرێنتی ئەم شارە</button></div>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
 
     <div class="logout"><a id="logoutLink">دەرچوون</a></div>
   </section>
@@ -303,7 +338,7 @@
   });
 
   // ---- scanning ----
-  let stream = null, scanning = false, videoEl = $('video');
+  let stream = null, scanning = false, processingScan = false, videoEl = $('video');
   async function startCamera(){
     try{
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -324,22 +359,40 @@
   $('startScanBtn').addEventListener('click', ()=>{ if(scanning) stopCamera(); else startCamera(); });
 
   const scanCanvas = document.createElement('canvas');
-  let lastScanTime = 0;
+  let lastDetectedCode = '';
+  let lastCodeSeenAt = 0;
+
   function scanLoop(){
     if(!scanning) return;
+
     if(videoEl.readyState === videoEl.HAVE_ENOUGH_DATA){
       scanCanvas.width = videoEl.videoWidth;
       scanCanvas.height = videoEl.videoHeight;
       const ctx = scanCanvas.getContext('2d');
       ctx.drawImage(videoEl, 0, 0, scanCanvas.width, scanCanvas.height);
       const imageData = ctx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      const found = jsQR(imageData.data, imageData.width, imageData.height);
       const now = Date.now();
-      if(code && code.data && (now - lastScanTime > 2500)){
-        lastScanTime = now;
-        handleCode(code.data.trim());
+
+      if(found && found.data){
+        const code = found.data.trim().toUpperCase();
+        lastCodeSeenAt = now;
+
+        if(code && !processingScan && code !== lastDetectedCode){
+          lastDetectedCode = code;
+          processingScan = true;
+
+          handleCode(code).finally(()=>{
+            // کامێرا بەخۆکار دەردەوام دەبێت؛ بۆ QR ـی داهاتوو کلیک پێویست نییە.
+            setTimeout(()=>{ processingScan = false; }, 700);
+          });
+        }
+      }else if(lastDetectedCode && now - lastCodeSeenAt > 900){
+        // QR ـی پێشوو لە کامێرا چوو؛ ئێستا QR ـی نوێ دەتوانرێت پشکنین بکرێت.
+        lastDetectedCode = '';
       }
     }
+
     requestAnimationFrame(scanLoop);
   }
 
@@ -355,6 +408,7 @@
         $('resultStatus').textContent = '✅ چوونەژوورەوە سەرکەوتوو بوو';
         $('resultName').textContent = r.name + (r.school ? (' — ' + r.school) : '');
         $('resultTime').textContent = new Date().toLocaleTimeString('en-GB');
+        refreshStats();
         
       } else if(r.error === 'already'){
         $('resultCard').className = 'result-card warn';
@@ -390,49 +444,92 @@
   });
   $('manualCode').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); $('manualBtn').click(); } });
 
-  // ---- dashboard ----
+  // ---- dashboard + city reports ----
   const CITIES = ['هەولێر','ئاکرێ','هەریر','رانیە','کەلار','سڵیمانی','سۆران','دهۆک'];
+  let lastByCity = {};
+  let selectedCity = '';
+
+  function orderedCities(data){
+    const known = CITIES.filter(c => data[c]);
+    const extra = Object.keys(data || {}).filter(c => !CITIES.includes(c)).sort();
+    return [...known, ...extra];
+  }
 
   function renderCityList(byCity){
     const wrap = $('cityList');
     wrap.innerHTML = '';
     const data = byCity || {};
-    // شارە دیاریکراوەکان بەپێی ڕیزبەندی خۆیان، دواتر هەر شارێکی تر کە لە داتادا هەیە
-    const knownKeys = CITIES.filter(c => data[c]);
-    const extraKeys = Object.keys(data).filter(c => !CITIES.includes(c)).sort();
-    const orderedKeys = [...knownKeys, ...extraKeys];
-
-    if(orderedKeys.length === 0){
-      wrap.innerHTML = '<div class="hint">هێشتا هیچ داتایەک نییە</div>';
-      return;
-    }
-
-    orderedKeys.forEach(city => {
-      const c = data[city] || { total: 0, checkedIn: 0 };
+    const keys = orderedCities(data);
+    if(!keys.length){ wrap.innerHTML = '<div class="hint">هێشتا هیچ داتایەک نییە</div>'; return; }
+    keys.forEach(city => {
+      const c = data[city] || { total:0, checkedIn:0 };
       const pct = c.total ? Math.round((c.checkedIn / c.total) * 100) : 0;
       const row = document.createElement('div');
       row.className = 'city-row';
-      row.innerHTML =
-        '<div class="city-top">' +
-          '<div class="city-name">' + city + '</div>' +
-          '<div class="city-counts"><b>' + c.checkedIn + '</b> / ' + c.total + '</div>' +
-        '</div>' +
-        '<div class="city-bar-bg"><div class="city-bar-fill" style="width:' + pct + '%"></div></div>';
+      row.style.cursor = 'pointer';
+      row.title = 'کلیک بکە بۆ لیستی ئەم شارە';
+      row.innerHTML = '<div class="city-top"><div class="city-name">' + city + '</div><div class="city-counts"><b>' + c.checkedIn + '</b> / ' + c.total + '</div></div><div class="city-bar-bg"><div class="city-bar-fill" style="width:' + pct + '%"></div></div>';
+      row.addEventListener('click', ()=>openReport(city));
       wrap.appendChild(row);
     });
   }
 
+  function openReport(city){
+    selectedCity = city || '';
+    $('reportModal').classList.add('show');
+    renderCityPicks();
+    if(selectedCity) loadCityStudents(selectedCity);
+    else { $('reportTitle').textContent='لیستی شارەکان'; $('reportBody').innerHTML='<div class="hint">شارێک هەڵبژێرە</div>'; }
+  }
+
+  function renderCityPicks(){
+    const wrap = $('cityPicks');
+    const keys = orderedCities(lastByCity);
+    wrap.innerHTML = '';
+    keys.forEach(city=>{
+      const b=document.createElement('button');
+      b.className='city-pick' + (city===selectedCity ? ' active' : '');
+      b.textContent=city + ' (' + ((lastByCity[city]||{}).total||0) + ')';
+      b.addEventListener('click',()=>{ selectedCity=city; renderCityPicks(); loadCityStudents(city); });
+      wrap.appendChild(b);
+    });
+  }
+
+  async function loadCityStudents(city){
+    $('reportTitle').textContent = 'لیستی تۆمارکراوانی ' + city;
+    $('reportInfo').textContent = 'چاوەڕوانبە...';
+    $('reportBody').innerHTML = '<div class="hint">داتا بار دەکرێت...</div>';
+    try{
+      const r = await callApi({ action:'studentsByCity', city, adminKey:adminKey() });
+      const students = r.students || r.data || [];
+      const total = students.length;
+      const checked = students.filter(x=>x.checkedIn===true || x.checkedIn==='TRUE' || x.status==='checkedIn').length;
+      $('reportInfo').textContent = 'کۆی قوتابیان: ' + total + ' — چوونەژوورەوە: ' + checked;
+      if(!total){ $('reportBody').innerHTML='<div class="hint">هیچ قوتابییەک بۆ ئەم شارە نەدۆزرایەوە</div>'; return; }
+      const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+      $('reportBody').innerHTML='<table class="report-table"><thead><tr><th>#</th><th>ناو</th><th>قوتابخانە</th><th>بارودۆخ</th></tr></thead><tbody>'+students.map((x,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(x.name||x.studentName||'')+'</td><td>'+esc(x.school||x.schoolName||'')+'</td><td>'+((x.checkedIn===true||x.checkedIn==='TRUE'||x.status==='checkedIn')?'چووەتە ژوورەوە':'تۆمارکراو')+'</td></tr>').join('')+'</tbody></table>';
+    }catch(e){
+      $('reportInfo').textContent='';
+      $('reportBody').innerHTML='<div class="hint">نەتوانرا لیستی قوتابیان بهێنرێت. پێویستە لە Apps Script کردارێکی studentsByCity زیاد بکرێت.</div>';
+    }
+  }
+
+  $('statRegCard').addEventListener('click', ()=>openReport());
+  $('closeReportBtn').addEventListener('click', ()=>$('reportModal').classList.remove('show'));
+  $('reportModal').addEventListener('click', e=>{ if(e.target===$('reportModal')) $('reportModal').classList.remove('show'); });
+  $('printCityBtn').addEventListener('click', ()=>{ if(selectedCity) window.print(); else alert('تکایە یەکەم شارێک هەڵبژێرە'); });
+
   async function refreshStats(){
     try{
-      const r = await callApi({ action:'stats' });
-      const regCount = r.total || 0;
-      const inCount = r.checkedIn || 0;
+      const r = await callApi({ action:'stats', adminKey:adminKey() });
+      const regCount = r.total || 0, inCount = r.checkedIn || 0;
+      lastByCity = r.byCity || {};
       $('statReg').textContent = regCount;
       $('statIn').textContent = inCount;
       const pct = regCount ? Math.round((inCount/regCount)*100) : 0;
       $('barFill').style.width = pct + '%';
       $('barLabel').textContent = '٪' + pct + ' چوونەژوورەوە';
-      renderCityList(r.byCity);
+      renderCityList(lastByCity);
     }catch(e){}
   }
 </script>
