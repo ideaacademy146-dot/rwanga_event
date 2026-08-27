@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>ئیڤینتی ئاراستەی زانکۆ - سکانکردن (ئەدمین)</title>
@@ -15,7 +14,7 @@
   }
   *{box-sizing:border-box;}
   body{
-    margin:0; font-family:"Noto Sans Arabic","Segoe UI","Tahoma","Arial",sans-serif;
+    margin:0; font-family:"Segoe UI","Tahoma","Arial",sans-serif;
     background: radial-gradient(1200px 600px at 20% -10%, var(--navy-500), transparent),
                 linear-gradient(165deg, var(--navy-900), var(--navy-800) 60%, var(--navy-900));
     color:var(--white); min-height:100vh;
@@ -123,7 +122,7 @@
       <h2>چوونەژوورەوە</h2>
       <input type="password" id="passcode" placeholder="کۆدی نهێنی">
       <div class="error-box" id="gateError"></div>
-      <button type="button" class="primary" id="gateBtn">چوونەژوورەوە</button>
+      <button class="primary" id="gateBtn">چوونەژوورەوە</button>
     </div>
   </section>
 
@@ -211,7 +210,7 @@
   }
   function beep(freq, duration, type){
     try{
-      const ctx = 
+      const ctx = getAudioCtx();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = type || 'sine';
@@ -242,84 +241,46 @@
 
   async function callApi(params){
     const url = CONFIG.SCRIPT_URL + '?' + new URLSearchParams(params).toString();
-    const res = await fetch(url, { method:'GET', redirect:'follow', cache:'no-store' });
-    const text = await res.text();
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    try{
-      return JSON.parse(text);
-    }catch(err){
-      throw new Error('API_INVALID_JSON');
-    }
+    const res = await fetch(url);
+    return res.json();
   }
 
   function adminKey(){ return sessionStorage.getItem('adminKey') || ''; }
 
   // ---- gate ----
-  $('gateBtn').addEventListener('click', doGate);
-  $('passcode').addEventListener('keydown', (e)=>{
-    if(e.key === 'Enter'){
-      e.preventDefault();
-      doGate();
-    }
-  });
+  $('gateBtn').addEventListener('click', ()=>{ getAudioCtx(); doGate(); });
+  $('passcode').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); doGate(); } });
 
   async function doGate(){
     const key = $('passcode').value.trim();
-    const btn = $('gateBtn');
-    const errBox = $('gateError');
-
-    errBox.style.display = 'none';
-
-    if(!key){
-      errBox.textContent = 'تکایە کۆدی نهێنی داخل بکە.';
-      errBox.style.display = 'block';
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'تکایە چاوەڕێ بە...';
-
+    $('gateError').style.display = 'none';
+    if(!key) return;
+    $('gateBtn').disabled = true;
     try{
-      const r = await callApi({ action:'verifyAdmin', key:key });
-
-      if(r && r.success === true){
+      const r = await callApi({ action:'verifyAdmin', key });
+      if(r.success){
         sessionStorage.setItem('adminKey', key);
         $('gate').hidden = true;
         $('app').hidden = false;
-        $('passcode').value = '';
-        await refreshStats();
-      }else{
-        errBox.textContent = 'کۆدی نهێنی هەڵەیە.';
-        errBox.style.display = 'block';
+        refreshStats();
+      } else {
+        $('gateError').textContent = 'کۆدی نهێنی هەڵەیە.';
+        $('gateError').style.display = 'block';
       }
     }catch(e){
-      errBox.textContent = 'پەیوەندی بە سیستەمەکە نەکرا. تکایە ئینتەرنێت و SCRIPT_URL بپشکنە.';
-      errBox.style.display = 'block';
-      console.error('Login error:', e);
+      $('gateError').textContent = 'نەتوانرا پەیوەندی بکرێت. تۆڕی ئینتەرنێت بپشکنە.';
+      $('gateError').style.display = 'block';
     }finally{
-      btn.disabled = false;
-      btn.textContent = 'چوونەژوورەوە';
+      $('gateBtn').disabled = false;
     }
   }
 
-  // Verify any saved session instead of opening the app blindly.
-  (async function restoreSession(){
-    const savedKey = adminKey();
-    if(!savedKey) return;
-
-    try{
-      const r = await callApi({ action:'verifyAdmin', key:savedKey });
-      if(r && r.success === true){
-        $('gate').hidden = true;
-        $('app').hidden = false;
-        await refreshStats();
-      }else{
-        sessionStorage.removeItem('adminKey');
-      }
-    }catch(e){
-      sessionStorage.removeItem('adminKey');
-    }
-  })();
+  // resume session if already verified this browser session
+  if(sessionStorage.getItem('adminKey')){
+    $('gate').hidden = true;
+    $('app').hidden = false;
+    refreshStats();
+  }
 
   $('logoutLink').addEventListener('click', ()=>{
     sessionStorage.removeItem('adminKey');
@@ -342,7 +303,6 @@
   let stream = null, scanning = false, processingScan = false, videoEl = $('video');
   async function startCamera(){
     try{
-      if(stream) stopCamera();
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       videoEl.srcObject = stream;
       await videoEl.play();
@@ -358,58 +318,26 @@
     if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
     $('startScanBtn').textContent = 'کردنەوەی کامێرا';
   }
-  $('startScanBtn').addEventListener('click', ()=>{ if(scanning) stopCamera(); else startCamera(); });
+  $('startScanBtn').addEventListener('click', ()=>{ getAudioCtx(); if(scanning) stopCamera(); else startCamera(); });
 
   const scanCanvas = document.createElement('canvas');
-
-  let processingScan = false;
-  let lastScannedCode = '';
-  let lastSeenCode = '';
-  let qrMissingSince = 0;
-
+  let lastScanTime = 0;
   function scanLoop(){
     if(!scanning) return;
-
     if(videoEl.readyState === videoEl.HAVE_ENOUGH_DATA){
       scanCanvas.width = videoEl.videoWidth;
       scanCanvas.height = videoEl.videoHeight;
-
       const ctx = scanCanvas.getContext('2d');
       ctx.drawImage(videoEl, 0, 0, scanCanvas.width, scanCanvas.height);
-
       const imageData = ctx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
-      const found = jsQR(imageData.data, imageData.width, imageData.height);
-
-      if(found && found.data){
-        const code = found.data.trim().toUpperCase();
-
-        qrMissingSince = 0;
-        lastSeenCode = code;
-
-        if(code && !processingScan && code !== lastScannedCode){
-          processingScan = true;
-          lastScannedCode = code;
-
-          handleCode(code)
-            .catch(()=>{})
-            .finally(()=>{
-              processingScan = false;
-            });
-        }
-
-      }else{
-        if(lastSeenCode && !qrMissingSince){
-          qrMissingSince = Date.now();
-        }
-
-        if(qrMissingSince && Date.now() - qrMissingSince > 700){
-          lastScannedCode = '';
-          lastSeenCode = '';
-          qrMissingSince = 0;
-        }
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      const now = Date.now();
+      if(code && code.data && !processingScan && (now - lastScanTime > 2500)){
+        lastScanTime = now;
+        processingScan = true;
+        handleCode(code.data.trim()).finally(()=>{ setTimeout(()=>processingScan = false, 900); });
       }
     }
-
     requestAnimationFrame(scanLoop);
   }
 
@@ -422,7 +350,8 @@
   }
 
   async function handleCode(code){
-        code = code.toUpperCase();
+    getAudioCtx(); // دڵنیابوونەوە لەوەی دەنگ کراوەیە پێش هەر پشکنینێک
+    code = code.toUpperCase();
     $('resultCard').style.display = 'block';
     $('resultCard').className = 'result-card';
     try{
@@ -430,36 +359,37 @@
       if(r.success){
         $('resultCard').className = 'result-card ok';
         $('resultStatus').textContent = '✅ قوتابی تۆمار کرا';
-        $('resultName').textContent = (r.name || r.fullName || '') + (r.school ? (' — ' + r.school) : '');
+        $('resultName').textContent = r.name + (r.school ? (' — ' + r.school) : '');
         $('resultTime').textContent = new Date().toLocaleTimeString('en-GB');
-        
         showToast('🔔 بلی، تۆمار کرا');
+        playSuccessSound();
+        showToast('🔔 قوتابی تۆمار کرا');
         refreshStats();
       } else if(r.error === 'already'){
         $('resultCard').className = 'result-card warn';
         $('resultStatus').textContent = '⚠️ پێشتر چووەتە ژوورەوە';
         $('resultName').textContent = r.name;
         $('resultTime').textContent = 'کاتی یەکەم چوونەژوورەوە: ' + r.time;
-        
+        playWarnSound();
       } else if(r.error === 'unauthorized'){
         $('resultCard').className = 'result-card bad';
         $('resultStatus').textContent = '🔒 کۆدی ئەدمین نادروستە';
         $('resultName').textContent = '';
         $('resultTime').textContent = 'دووبارە بچۆرەوە ژوورەوە.';
-        
+        playErrorSound();
       } else {
         $('resultCard').className = 'result-card bad';
         $('resultStatus').textContent = '❌ ئەم کۆدە تۆمار نەکراوە';
         $('resultName').textContent = code;
         $('resultTime').textContent = '';
-        
+        playErrorSound();
       }
     }catch(e){
       $('resultCard').className = 'result-card bad';
       $('resultStatus').textContent = '❌ هەڵەیەک ڕوویدا';
       $('resultName').textContent = '';
       $('resultTime').textContent = 'تۆڕی ئینتەرنێت بپشکنە';
-      
+      playErrorSound();
     }
   }
 
