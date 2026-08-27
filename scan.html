@@ -498,7 +498,48 @@
   $('statRegCard').addEventListener('click', ()=>openReport());
   $('closeReportBtn').addEventListener('click', ()=>$('reportModal').classList.remove('show'));
   $('reportModal').addEventListener('click', e=>{ if(e.target===$('reportModal')) $('reportModal').classList.remove('show'); });
-  $('printCityBtn').addEventListener('click', ()=>{ if(selectedCity) window.print(); else showToast('تکایە یەکەم شارێک هەڵبژێرە'); });
+  function printSelectedCity(){
+    if(!selectedCity){
+      showToast('تکایە یەکەم شارێک هەڵبژێرە');
+      return;
+    }
+
+    const area = $('printArea');
+    if(!area){
+      showToast('بەشی پرێنت نەدۆزرایەوە');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if(!printWindow){
+      showToast('ڕێگە بە پەنجەرەی پرێنت بدە (Pop-up)');
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(
+      '<!DOCTYPE html><html dir="rtl" lang="ckb"><head>' +
+      '<meta charset="UTF-8">' +
+      '<title>' + selectedCity + ' - لیستی تۆمارکراوان</title>' +
+      '<style>' +
+      '@font-face{font-family:Rabar;src:local("Rabar 022"),local("Rabar_022"),local("Rabar");}' +
+      'body{font-family:Rabar,Tahoma,Arial,sans-serif;direction:rtl;color:#111;padding:24px;}' +
+      'h2{text-align:center;margin:0 0 10px;}' +
+      '.hint{text-align:center;margin-bottom:16px;}' +
+      'table{width:100%;border-collapse:collapse;font-size:14px;}' +
+      'th,td{border:1px solid #222;padding:9px 7px;text-align:right;}' +
+      'th{font-weight:700;background:#f2f2f2;}' +
+      '@page{size:auto;margin:12mm;}' +
+      '@media print{body{padding:0;}}' +
+      '</style></head><body>' +
+      area.innerHTML +
+      '<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},300);};window.onafterprint=function(){window.close();};<\/script>' +
+      '</body></html>'
+    );
+    printWindow.document.close();
+  }
+
+  $('printCityBtn').addEventListener('click', printSelectedCity);
 
   async function refreshStats(){
     try{
