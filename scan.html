@@ -111,9 +111,33 @@
   .success-modal h2{ margin:0 0 8px; color:#126f5d; font-size:24px; }
   .success-modal .student-name{ font-size:20px; font-weight:800; color:#17324d; margin-top:8px; }
 
+
+  /* Notification for successful check-in */
+  .toast-notification{
+    position:fixed;
+    top:20px;
+    left:50%;
+    transform:translateX(-50%) translateY(-120px);
+    background:#16a34a;
+    color:#fff;
+    padding:15px 28px;
+    border-radius:12px;
+    font-size:20px;
+    font-weight:700;
+    z-index:999999;
+    opacity:0;
+    box-shadow:0 8px 25px rgba(0,0,0,.22);
+    transition:all .35s ease;
+    pointer-events:none;
+  }
+  .toast-notification.show{
+    transform:translateX(-50%) translateY(0);
+    opacity:1;
+  }
 </style>
 </head>
 <body>
+<div id="toastNotification" class="toast-notification">🔔 بلی، تۆمار کرا</div>
 <div class="stripe"></div>
 <div class="wrap">
 
@@ -214,6 +238,17 @@
 
   const $ = (id) => document.getElementById(id);
 
+  function showRegisteredNotification(){
+    const toast = $('toastNotification');
+    if(!toast) return;
+    toast.classList.add('show');
+    clearTimeout(window.__toastTimer);
+    window.__toastTimer = setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2500);
+  }
+
+
   // ===== دەنگی ئاگادارکردنەوە (بیپ) =====
   let audioCtx = null;
   function getAudioCtx(){
@@ -275,6 +310,7 @@
     try{
       const r = await callApi({ action:'verifyAdmin', key });
       if(r.success){
+        showRegisteredNotification();
         sessionStorage.setItem('adminKey', key);
         $('gate').hidden = true;
         $('app').hidden = false;
@@ -386,7 +422,7 @@
         $('resultStatus').textContent = '✅ قوتابی تۆمار کرا';
         $('resultName').textContent = r.name + (r.school ? (' — ' + r.school) : '');
         $('resultTime').textContent = new Date().toLocaleTimeString('en-GB');
-        playSuccessSound();
+        
         showToast('🔔 قوتابی تۆمار کرا');
         showSuccessNotification(r.name);
         refreshStats();
@@ -395,26 +431,26 @@
         $('resultStatus').textContent = '⚠️ پێشتر چووەتە ژوورەوە';
         $('resultName').textContent = r.name;
         $('resultTime').textContent = 'کاتی یەکەم چوونەژوورەوە: ' + r.time;
-        playWarnSound();
+        
       } else if(r.error === 'unauthorized'){
         $('resultCard').className = 'result-card bad';
         $('resultStatus').textContent = '🔒 کۆدی ئەدمین نادروستە';
         $('resultName').textContent = '';
         $('resultTime').textContent = 'دووبارە بچۆرەوە ژوورەوە.';
-        playErrorSound();
+        
       } else {
         $('resultCard').className = 'result-card bad';
         $('resultStatus').textContent = '❌ ئەم کۆدە تۆمار نەکراوە';
         $('resultName').textContent = code;
         $('resultTime').textContent = '';
-        playErrorSound();
+        
       }
     }catch(e){
       $('resultCard').className = 'result-card bad';
       $('resultStatus').textContent = '❌ هەڵەیەک ڕوویدا';
       $('resultName').textContent = '';
       $('resultTime').textContent = 'تۆڕی ئینتەرنێت بپشکنە';
-      playErrorSound();
+      
     }
   }
 
@@ -531,7 +567,30 @@
       'th{font-weight:700;background:#f2f2f2;}' +
       '@page{size:auto;margin:12mm;}' +
       '@media print{body{padding:0;}}' +
-      '</style></head><body>' +
+      '
+  /* Notification for successful check-in */
+  .toast-notification{
+    position:fixed;
+    top:20px;
+    left:50%;
+    transform:translateX(-50%) translateY(-120px);
+    background:#16a34a;
+    color:#fff;
+    padding:15px 28px;
+    border-radius:12px;
+    font-size:20px;
+    font-weight:700;
+    z-index:999999;
+    opacity:0;
+    box-shadow:0 8px 25px rgba(0,0,0,.22);
+    transition:all .35s ease;
+    pointer-events:none;
+  }
+  .toast-notification.show{
+    transform:translateX(-50%) translateY(0);
+    opacity:1;
+  }
+</style></head><body>' +
       area.innerHTML +
       '<script>window.onload=function(){setTimeout(function(){window.focus();window.print();},300);};window.onafterprint=function(){window.close();};<\/script>' +
       '</body></html>'
