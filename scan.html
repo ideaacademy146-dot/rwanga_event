@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>ئیڤێنتی ئاراستەی زانکۆ - سکانکردن (ئەدمین)</title>
+<title>ئیڤینتی ئاراستەی زانکۆ - سکانکردن (ئەدمین)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
 <style>
   :root{
@@ -14,7 +15,7 @@
   }
   *{box-sizing:border-box;}
   body{
-    margin:0; font-family:"Segoe UI","Tahoma","Arial",sans-serif;
+    margin:0; font-family:"Noto Sans Arabic","Segoe UI","Tahoma","Arial",sans-serif;
     background: radial-gradient(1200px 600px at 20% -10%, var(--navy-500), transparent),
                 linear-gradient(165deg, var(--navy-900), var(--navy-800) 60%, var(--navy-900));
     color:var(--white); min-height:100vh;
@@ -83,31 +84,6 @@
   .city-counts b{ color:var(--navy-600); }
   .city-bar-bg{ background:#e4ecf6; border-radius:999px; height:7px; overflow:hidden; }
   .city-bar-fill{ background:var(--teal-dark); height:100%; width:0%; transition:width .4s; }
-
-  /* نۆتیفیکەیشنی تۆمارکردنی سەرکەوتوو */
-  .toast-notification{
-    position:fixed;
-    top:20px;
-    left:50%;
-    transform:translateX(-50%) translateY(-120px);
-    background:#16a34a;
-    color:#fff;
-    padding:14px 26px;
-    border-radius:12px;
-    font-size:18px;
-    font-weight:700;
-    z-index:999999;
-    opacity:0;
-    pointer-events:none;
-    transition:all .35s ease;
-    box-shadow:0 8px 24px rgba(0,0,0,.22);
-  }
-  .toast-notification.show{
-    transform:translateX(-50%) translateY(0);
-    opacity:1;
-  }
-
-
   .clickable-stat{ cursor:pointer; }
   .clickable-stat:hover{ transform:translateY(-1px); }
   .modal-backdrop{ position:fixed; inset:0; background:rgba(8,24,48,.72); display:none; align-items:center; justify-content:center; padding:18px; z-index:50; }
@@ -127,11 +103,9 @@
   .toast{ position:fixed; top:18px; left:50%; transform:translate(-50%,-20px); background:#1f8f7f; color:#fff; padding:13px 20px; border-radius:14px; font-weight:800; box-shadow:0 10px 30px rgba(0,0,0,.22); opacity:0; pointer-events:none; transition:.25s; z-index:70; }
   .toast.show{ opacity:1; transform:translate(-50%,0); }
   @media print{ body{ background:#fff !important; color:#000 !important; } body *{ visibility:hidden !important; } #printArea,#printArea *{ visibility:visible !important; } #printArea{ position:absolute; inset:0; width:100%; padding:12mm; } .no-print{ display:none !important; } }
-
 </style>
 </head>
 <body>
-  <div id="toastNotification" class="toast-notification">🔔 بلی، تۆمار کرا</div>
 <div class="stripe"></div>
 <div class="wrap">
 
@@ -149,7 +123,7 @@
       <h2>چوونەژوورەوە</h2>
       <input type="password" id="passcode" placeholder="کۆدی نهێنی">
       <div class="error-box" id="gateError"></div>
-      <button class="primary" id="gateBtn">چوونەژوورەوە</button>
+      <button type="button" class="primary" id="gateBtn">چوونەژوورەوە</button>
     </div>
   </section>
 
@@ -225,17 +199,6 @@
 
   const $ = (id) => document.getElementById(id);
 
-  function showRegisteredNotification(){
-    const toast = $('toastNotification');
-    if(!toast) return;
-    toast.classList.add('show');
-    clearTimeout(window.__registeredToastTimer);
-    window.__registeredToastTimer = setTimeout(()=>{
-      toast.classList.remove('show');
-    }, 2500);
-  }
-
-
   // ===== دەنگی ئاگادارکردنەوە (بیپ) =====
   let audioCtx = null;
   function getAudioCtx(){
@@ -248,7 +211,7 @@
   }
   function beep(freq, duration, type){
     try{
-      const ctx = getAudioCtx();
+      const ctx = 
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = type || 'sine';
@@ -279,46 +242,84 @@
 
   async function callApi(params){
     const url = CONFIG.SCRIPT_URL + '?' + new URLSearchParams(params).toString();
-    const res = await fetch(url);
-    return res.json();
+    const res = await fetch(url, { method:'GET', redirect:'follow', cache:'no-store' });
+    const text = await res.text();
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    try{
+      return JSON.parse(text);
+    }catch(err){
+      throw new Error('API_INVALID_JSON');
+    }
   }
 
   function adminKey(){ return sessionStorage.getItem('adminKey') || ''; }
 
   // ---- gate ----
-  $('gateBtn').addEventListener('click', ()=>{ doGate(); });
-  $('passcode').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); doGate(); } });
+  $('gateBtn').addEventListener('click', doGate);
+  $('passcode').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      doGate();
+    }
+  });
 
   async function doGate(){
     const key = $('passcode').value.trim();
-    $('gateError').style.display = 'none';
-    if(!key) return;
-    $('gateBtn').disabled = true;
+    const btn = $('gateBtn');
+    const errBox = $('gateError');
+
+    errBox.style.display = 'none';
+
+    if(!key){
+      errBox.textContent = 'تکایە کۆدی نهێنی داخل بکە.';
+      errBox.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'تکایە چاوەڕێ بە...';
+
     try{
-      const r = await callApi({ action:'verifyAdmin', key });
-      if(r.success){
+      const r = await callApi({ action:'verifyAdmin', key:key });
+
+      if(r && r.success === true){
         sessionStorage.setItem('adminKey', key);
         $('gate').hidden = true;
         $('app').hidden = false;
-        refreshStats();
-      } else {
-        $('gateError').textContent = 'کۆدی نهێنی هەڵەیە.';
-        $('gateError').style.display = 'block';
+        $('passcode').value = '';
+        await refreshStats();
+      }else{
+        errBox.textContent = 'کۆدی نهێنی هەڵەیە.';
+        errBox.style.display = 'block';
       }
     }catch(e){
-      $('gateError').textContent = 'نەتوانرا پەیوەندی بکرێت. تۆڕی ئینتەرنێت بپشکنە.';
-      $('gateError').style.display = 'block';
+      errBox.textContent = 'پەیوەندی بە سیستەمەکە نەکرا. تکایە ئینتەرنێت و SCRIPT_URL بپشکنە.';
+      errBox.style.display = 'block';
+      console.error('Login error:', e);
     }finally{
-      $('gateBtn').disabled = false;
+      btn.disabled = false;
+      btn.textContent = 'چوونەژوورەوە';
     }
   }
 
-  // resume session if already verified this browser session
-  if(sessionStorage.getItem('adminKey')){
-    $('gate').hidden = true;
-    $('app').hidden = false;
-    refreshStats();
-  }
+  // Verify any saved session instead of opening the app blindly.
+  (async function restoreSession(){
+    const savedKey = adminKey();
+    if(!savedKey) return;
+
+    try{
+      const r = await callApi({ action:'verifyAdmin', key:savedKey });
+      if(r && r.success === true){
+        $('gate').hidden = true;
+        $('app').hidden = false;
+        await refreshStats();
+      }else{
+        sessionStorage.removeItem('adminKey');
+      }
+    }catch(e){
+      sessionStorage.removeItem('adminKey');
+    }
+  })();
 
   $('logoutLink').addEventListener('click', ()=>{
     sessionStorage.removeItem('adminKey');
@@ -341,6 +342,7 @@
   let stream = null, scanning = false, processingScan = false, videoEl = $('video');
   async function startCamera(){
     try{
+      if(stream) stopCamera();
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       videoEl.srcObject = stream;
       await videoEl.play();
@@ -359,8 +361,11 @@
   $('startScanBtn').addEventListener('click', ()=>{ if(scanning) stopCamera(); else startCamera(); });
 
   const scanCanvas = document.createElement('canvas');
-  let lastDetectedCode = '';
-  let lastCodeSeenAt = 0;
+
+  let processingScan = false;
+  let lastScannedCode = '';
+  let lastSeenCode = '';
+  let qrMissingSince = 0;
 
   function scanLoop(){
     if(!scanning) return;
@@ -368,32 +373,52 @@
     if(videoEl.readyState === videoEl.HAVE_ENOUGH_DATA){
       scanCanvas.width = videoEl.videoWidth;
       scanCanvas.height = videoEl.videoHeight;
+
       const ctx = scanCanvas.getContext('2d');
       ctx.drawImage(videoEl, 0, 0, scanCanvas.width, scanCanvas.height);
+
       const imageData = ctx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
       const found = jsQR(imageData.data, imageData.width, imageData.height);
-      const now = Date.now();
 
       if(found && found.data){
         const code = found.data.trim().toUpperCase();
-        lastCodeSeenAt = now;
 
-        if(code && !processingScan && code !== lastDetectedCode){
-          lastDetectedCode = code;
+        qrMissingSince = 0;
+        lastSeenCode = code;
+
+        if(code && !processingScan && code !== lastScannedCode){
           processingScan = true;
+          lastScannedCode = code;
 
-          handleCode(code).finally(()=>{
-            // کامێرا بەخۆکار دەردەوام دەبێت؛ بۆ QR ـی داهاتوو کلیک پێویست نییە.
-            setTimeout(()=>{ processingScan = false; }, 700);
-          });
+          handleCode(code)
+            .catch(()=>{})
+            .finally(()=>{
+              processingScan = false;
+            });
         }
-      }else if(lastDetectedCode && now - lastCodeSeenAt > 900){
-        // QR ـی پێشوو لە کامێرا چوو؛ ئێستا QR ـی نوێ دەتوانرێت پشکنین بکرێت.
-        lastDetectedCode = '';
+
+      }else{
+        if(lastSeenCode && !qrMissingSince){
+          qrMissingSince = Date.now();
+        }
+
+        if(qrMissingSince && Date.now() - qrMissingSince > 700){
+          lastScannedCode = '';
+          lastSeenCode = '';
+          qrMissingSince = 0;
+        }
       }
     }
 
     requestAnimationFrame(scanLoop);
+  }
+
+  function showToast(message){
+    const toast = $('toast');
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(()=>toast.classList.remove('show'), 3000);
   }
 
   async function handleCode(code){
@@ -403,13 +428,13 @@
     try{
       const r = await callApi({ action:'checkin', code, adminKey: adminKey() });
       if(r.success){
-        showRegisteredNotification();
         $('resultCard').className = 'result-card ok';
-        $('resultStatus').textContent = '✅ چوونەژوورەوە سەرکەوتوو بوو';
-        $('resultName').textContent = r.name + (r.school ? (' — ' + r.school) : '');
+        $('resultStatus').textContent = '✅ قوتابی تۆمار کرا';
+        $('resultName').textContent = (r.name || r.fullName || '') + (r.school ? (' — ' + r.school) : '');
         $('resultTime').textContent = new Date().toLocaleTimeString('en-GB');
-        refreshStats();
         
+        showToast('🔔 بلی، تۆمار کرا');
+        refreshStats();
       } else if(r.error === 'already'){
         $('resultCard').className = 'result-card warn';
         $('resultStatus').textContent = '⚠️ پێشتر چووەتە ژوورەوە';
@@ -517,7 +542,7 @@
   $('statRegCard').addEventListener('click', ()=>openReport());
   $('closeReportBtn').addEventListener('click', ()=>$('reportModal').classList.remove('show'));
   $('reportModal').addEventListener('click', e=>{ if(e.target===$('reportModal')) $('reportModal').classList.remove('show'); });
-  $('printCityBtn').addEventListener('click', ()=>{ if(selectedCity) window.print(); else alert('تکایە یەکەم شارێک هەڵبژێرە'); });
+  $('printCityBtn').addEventListener('click', ()=>{ if(selectedCity) window.print(); else showToast('تکایە یەکەم شارێک هەڵبژێرە'); });
 
   async function refreshStats(){
     try{
