@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>ئیڤینتی ئاراستەی زانکۆ - سکانکردن (ئەدمین)</title>
+<title>ئیڤێنتی ئاراستەی زانکۆ - سکانکردن (ئەدمین)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
 <style>
   :root{
@@ -58,6 +58,31 @@
   .result-card .name{ font-size:20px; font-weight:800; color:var(--ink); margin:6px 0 2px; }
   .result-card .status{ font-size:16px; font-weight:700; }
   .result-card .time{ font-size:12.5px; color:var(--muted); margin-top:4px;}
+  .toast{
+    position:fixed; top:18px; right:18px; left:18px; z-index:9999;
+    max-width:520px; margin:auto; padding:14px 18px; border-radius:14px;
+    background:var(--green); color:#fff; font-size:16px; font-weight:800;
+    box-shadow:0 12px 30px rgba(0,0,0,.28); text-align:center;
+    transform:translateY(-130%); opacity:0; transition:.3s ease; pointer-events:none;
+  }
+  .toast.show{ transform:translateY(0); opacity:1; }
+  .report-tools{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:14px; }
+  .report-tools select{ flex:1; min-width:180px; }
+  .report-table-wrap{ overflow:auto; margin-top:14px; border:1px solid #dbe6f3; border-radius:12px; }
+  table.report-table{ width:100%; border-collapse:collapse; min-width:900px; background:#fff; color:var(--ink); }
+  .report-table th,.report-table td{ padding:9px 8px; border-bottom:1px solid #e6edf5; text-align:right; font-size:12px; white-space:nowrap; }
+  .report-table th{ background:#eef5fb; font-weight:800; }
+  .report-actions{ display:flex; gap:8px; }
+  .report-actions button{ flex:1; }
+  @media print{
+    body{ background:#fff; color:#111; }
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{ position:absolute; inset:0; width:100%; padding:20px; color:#111; }
+    #printArea table{ width:100%; border-collapse:collapse; }
+    #printArea th,#printArea td{ border:1px solid #777; padding:6px; font-size:10px; }
+    #printArea h2{ text-align:center; }
+  }
   .manual{ margin-top:14px; }
   .manual .row{ display:flex; gap:8px; }
   .manual input{ flex:1; }
@@ -74,37 +99,10 @@
   footer{ text-align:center; font-size:12px; color:#7d95b5; margin-top:26px; }
   .logout{ text-align:center; margin-top:8px; }
   .logout a{ color:#a9c1de; font-size:12.5px; cursor:pointer; text-decoration:underline; }
-  .city-list{ display:flex; flex-direction:column; gap:12px; }
-  .city-row{ padding-bottom:10px; border-bottom:1px solid #eef3f9; }
-  .city-row:last-child{ border-bottom:none; padding-bottom:0; }
-  .city-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
-  .city-name{ font-weight:700; font-size:14.5px; color:var(--ink); }
-  .city-counts{ font-size:12.5px; color:var(--muted); }
-  .city-counts b{ color:var(--navy-600); }
-  .city-bar-bg{ background:#e4ecf6; border-radius:999px; height:7px; overflow:hidden; }
-  .city-bar-fill{ background:var(--teal-dark); height:100%; width:0%; transition:width .4s; }
-  .clickable-stat{ cursor:pointer; }
-  .clickable-stat:hover{ transform:translateY(-1px); }
-  .modal-backdrop{ position:fixed; inset:0; background:rgba(8,24,48,.72); display:none; align-items:center; justify-content:center; padding:18px; z-index:50; }
-  .modal-backdrop.show{ display:flex; }
-  .modal{ width:min(760px,100%); max-height:90vh; overflow:auto; background:#fff; color:var(--ink); border-radius:18px; padding:18px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
-  .modal-head{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
-  .modal-head h2{ margin:0; }
-  .close-btn{ width:auto; padding:8px 12px; border:0; border-radius:10px; cursor:pointer; background:#eef3f9; color:var(--ink); font-weight:700; }
-  .city-picks{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
-  .city-pick{ border:1px solid #d7e2ef; background:#f8fbff; border-radius:10px; padding:9px 12px; cursor:pointer; font-weight:700; }
-  .city-pick.active{ background:var(--teal); border-color:var(--teal); color:var(--navy-900); }
-  .report-table{ width:100%; border-collapse:collapse; font-size:13px; }
-  .report-table th,.report-table td{ border-bottom:1px solid #e6edf5; padding:10px 8px; text-align:right; }
-  .report-table th{ background:#f5f8fc; position:sticky; top:0; }
-  .report-actions{ display:flex; gap:8px; margin-top:14px; }
-  .report-actions button{ flex:1; }
-  .toast{ position:fixed; top:18px; left:50%; transform:translate(-50%,-20px); background:#1f8f7f; color:#fff; padding:13px 20px; border-radius:14px; font-weight:800; box-shadow:0 10px 30px rgba(0,0,0,.22); opacity:0; pointer-events:none; transition:.25s; z-index:70; }
-  .toast.show{ opacity:1; transform:translate(-50%,0); }
-  @media print{ body{ background:#fff !important; color:#000 !important; } body *{ visibility:hidden !important; } #printArea,#printArea *{ visibility:visible !important; } #printArea{ position:absolute; inset:0; width:100%; padding:12mm; } .no-print{ display:none !important; } }
 </style>
 </head>
 <body>
+<div id="toast" class="toast">قوتابی بە سەرکەوتوویی داخل بووە ✅</div>
 <div class="stripe"></div>
 <div class="wrap">
 
@@ -158,33 +156,36 @@
 
     <div id="tab-dashboard" hidden>
       <div class="stat-grid">
-        <div class="stat clickable-stat" id="statRegCard" title="کلیک بکە بۆ لیستی شارەکان"><div class="num" id="statReg">0</div><div class="lbl">تۆمارکراو — کلیک بۆ لیستی شارەکان</div></div>
+        <div class="stat"><div class="num" id="statReg">0</div><div class="lbl">تۆمارکراو</div></div>
         <div class="stat"><div class="num" id="statIn">0</div><div class="lbl">چوونەژوورەوە</div></div>
       </div>
       <div class="card" style="margin-top:14px;">
         <div class="bar-bg"><div class="bar-fill" id="barFill"></div></div>
         <div class="hint" id="barLabel" style="text-align:center;margin-top:8px;">٪٠ چوونەژوورەوە</div>
-        <button class="secondary" id="refreshBtn">نوێکردنەوە</button>
-      </div>
-      <div class="card" style="margin-top:14px;">
-        <h2>بەپێی شار</h2>
-        <div class="city-list" id="cityList"></div>
-      </div>
-    </div>
-
-    <div class="modal-backdrop" id="reportModal">
-      <div class="modal">
-        <div class="modal-head no-print"><h2>لیستی تۆمارکراوان بە پێی شار</h2><button class="close-btn" id="closeReportBtn">داخستن</button></div>
-        <div class="city-picks no-print" id="cityPicks"></div>
-        <div id="printArea">
-          <h2 id="reportTitle" style="margin:0 0 10px;">لیستی تۆمارکراوان</h2>
-          <div id="reportInfo" class="hint" style="margin-bottom:10px;"></div>
-          <div id="reportBody" class="hint">شارێک هەڵبژێرە</div>
+        <div class="report-tools">
+          <select id="cityFilter">
+            <option value="">هەموو شارەکان</option>
+          </select>
         </div>
-        <div class="report-actions no-print"><button class="secondary" id="printCityBtn">پرێنتی ئەم شارە</button></div>
+        <div class="report-actions">
+          <button class="secondary" id="refreshBtn">نوێکردنەوە</button>
+          <button class="secondary" id="printReportBtn">🖨️ پرێنتی ڕاپۆرت</button>
+        </div>
+        <div class="report-table-wrap" id="reportArea">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>#</th><th>ناوی سیانی</th><th>شار</th><th>ناوی ئامادەیی</th>
+                <th>لق</th><th>ڕەگەز</th><th>کۆنمرە</th><th>بەشی دڵخواز</th>
+                <th>دیاریی چاوەڕوانکراو</th><th>چوونەژوورەوە</th>
+              </tr>
+            </thead>
+            <tbody id="reportBody"></tbody>
+          </table>
+        </div>
+        <div id="printArea" hidden></div>
       </div>
     </div>
-    <div class="toast" id="toast"></div>
 
     <div class="logout"><a id="logoutLink">دەرچوون</a></div>
   </section>
@@ -194,50 +195,9 @@
 
 <script>
   // ===== پێش بڵاوکردنەوە، ئەم URLـە بگۆڕە بە URLـی Apps Script Web App ـی خۆت =====
-  const CONFIG = { SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbz7uZ89KeNvWA8JAzLLzI4Rnm4BCFIHdL_nMVV-UXVZN8eTUa3WkT1zJgqqpFFqSv-l/exec' };
+  const CONFIG = { SCRIPT_URL: 'AKfycbwqs5PbbmM5XdrOTRoPtiqbmBYY-0svpQjbXt27LRH04JomXHxNmcGKsydhFHj9UwoE/exec' };
 
   const $ = (id) => document.getElementById(id);
-
-  // ===== دەنگی ئاگادارکردنەوە (بیپ) =====
-  let audioCtx = null;
-  function getAudioCtx(){
-    if(!audioCtx){
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    // مرۆیلەکان کۆنتێکستی دەنگ دادەخەن تا کلیک ڕوونادات، لێرەدا دووبارە چالاکی دەکەینەوە
-    if(audioCtx.state === 'suspended') audioCtx.resume();
-    return audioCtx;
-  }
-  function beep(freq, duration, type){
-    try{
-      const ctx = getAudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = type || 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + duration + 0.02);
-    }catch(e){ /* دەنگ پاڵپشتی نەکراوە، هیچ مەکە */ }
-  }
-  function playSuccessSound(){
-    beep(880, 0.12, 'sine');
-    setTimeout(()=>beep(1180, 0.14, 'sine'), 130);
-    if(navigator.vibrate) navigator.vibrate(80);
-  }
-  function playWarnSound(){
-    beep(520, 0.18, 'sine');
-    setTimeout(()=>beep(520, 0.18, 'sine'), 220);
-    if(navigator.vibrate) navigator.vibrate([80,60,80]);
-  }
-  function playErrorSound(){
-    beep(220, 0.28, 'square');
-    if(navigator.vibrate) navigator.vibrate(250);
-  }
 
   async function callApi(params){
     const url = CONFIG.SCRIPT_URL + '?' + new URLSearchParams(params).toString();
@@ -248,7 +208,7 @@
   function adminKey(){ return sessionStorage.getItem('adminKey') || ''; }
 
   // ---- gate ----
-  $('gateBtn').addEventListener('click', ()=>{ getAudioCtx(); doGate(); });
+  $('gateBtn').addEventListener('click', doGate);
   $('passcode').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); doGate(); } });
 
   async function doGate(){
@@ -263,6 +223,7 @@
         $('gate').hidden = true;
         $('app').hidden = false;
         refreshStats();
+        loadReport();
       } else {
         $('gateError').textContent = 'کۆدی نهێنی هەڵەیە.';
         $('gateError').style.display = 'block';
@@ -280,6 +241,7 @@
     $('gate').hidden = true;
     $('app').hidden = false;
     refreshStats();
+    loadReport();
   }
 
   $('logoutLink').addEventListener('click', ()=>{
@@ -294,13 +256,13 @@
       btn.classList.add('active');
       $('tab-scan').hidden = (btn.dataset.tab !== 'scan');
       $('tab-dashboard').hidden = (btn.dataset.tab !== 'dashboard');
-      if(btn.dataset.tab === 'dashboard') refreshStats();
+      if(btn.dataset.tab === 'dashboard'){ refreshStats(); loadReport(); }
       else stopCamera();
     });
   });
 
   // ---- scanning ----
-  let stream = null, scanning = false, processingScan = false, videoEl = $('video');
+  let stream = null, scanning = false, videoEl = $('video');
   async function startCamera(){
     try{
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -318,7 +280,7 @@
     if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
     $('startScanBtn').textContent = 'کردنەوەی کامێرا';
   }
-  $('startScanBtn').addEventListener('click', ()=>{ getAudioCtx(); if(scanning) stopCamera(); else startCamera(); });
+  $('startScanBtn').addEventListener('click', ()=>{ if(scanning) stopCamera(); else startCamera(); });
 
   const scanCanvas = document.createElement('canvas');
   let lastScanTime = 0;
@@ -332,25 +294,15 @@
       const imageData = ctx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
       const code = jsQR(imageData.data, imageData.width, imageData.height);
       const now = Date.now();
-      if(code && code.data && !processingScan && (now - lastScanTime > 2500)){
+      if(code && code.data && (now - lastScanTime > 2500)){
         lastScanTime = now;
-        processingScan = true;
-        handleCode(code.data.trim()).finally(()=>{ setTimeout(()=>processingScan = false, 900); });
+        handleCode(code.data.trim());
       }
     }
     requestAnimationFrame(scanLoop);
   }
 
-  function showToast(message){
-    const toast = $('toast');
-    toast.textContent = message;
-    toast.classList.add('show');
-    clearTimeout(showToast._timer);
-    showToast._timer = setTimeout(()=>toast.classList.remove('show'), 3000);
-  }
-
   async function handleCode(code){
-    getAudioCtx(); // دڵنیابوونەوە لەوەی دەنگ کراوەیە پێش هەر پشکنینێک
     code = code.toUpperCase();
     $('resultCard').style.display = 'block';
     $('resultCard').className = 'result-card';
@@ -358,38 +310,33 @@
       const r = await callApi({ action:'checkin', code, adminKey: adminKey() });
       if(r.success){
         $('resultCard').className = 'result-card ok';
-        $('resultStatus').textContent = '✅ قوتابی تۆمار کرا';
+        $('resultStatus').textContent = '✅ چوونەژوورەوە سەرکەوتوو بوو';
         $('resultName').textContent = r.name + (r.school ? (' — ' + r.school) : '');
         $('resultTime').textContent = new Date().toLocaleTimeString('en-GB');
-        showToast('🔔 بلی، تۆمار کرا');
-        playSuccessSound();
-        showToast('🔔 قوتابی تۆمار کرا');
-        refreshStats();
+        showToast('قوتابی «' + r.name + '» بە سەرکەوتوویی داخل بووە ✅');
+        loadReport();
       } else if(r.error === 'already'){
         $('resultCard').className = 'result-card warn';
         $('resultStatus').textContent = '⚠️ پێشتر چووەتە ژوورەوە';
         $('resultName').textContent = r.name;
         $('resultTime').textContent = 'کاتی یەکەم چوونەژوورەوە: ' + r.time;
-        playWarnSound();
+        showToast('⚠️ ئەم قوتابییە پێشتر داخل بووە');
       } else if(r.error === 'unauthorized'){
         $('resultCard').className = 'result-card bad';
         $('resultStatus').textContent = '🔒 کۆدی ئەدمین نادروستە';
         $('resultName').textContent = '';
         $('resultTime').textContent = 'دووبارە بچۆرەوە ژوورەوە.';
-        playErrorSound();
       } else {
         $('resultCard').className = 'result-card bad';
         $('resultStatus').textContent = '❌ ئەم کۆدە تۆمار نەکراوە';
         $('resultName').textContent = code;
         $('resultTime').textContent = '';
-        playErrorSound();
       }
     }catch(e){
       $('resultCard').className = 'result-card bad';
       $('resultStatus').textContent = '❌ هەڵەیەک ڕوویدا';
       $('resultName').textContent = '';
       $('resultTime').textContent = 'تۆڕی ئینتەرنێت بپشکنە';
-      playErrorSound();
     }
   }
 
@@ -399,92 +346,99 @@
   });
   $('manualCode').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); $('manualBtn').click(); } });
 
-  // ---- dashboard + city reports ----
-  const CITIES = ['هەولێر','ئاکرێ','هەریر','رانیە','کەلار','سڵیمانی','سۆران','دهۆک'];
-  let lastByCity = {};
-  let selectedCity = '';
 
-  function orderedCities(data){
-    const known = CITIES.filter(c => data[c]);
-    const extra = Object.keys(data || {}).filter(c => !CITIES.includes(c)).sort();
-    return [...known, ...extra];
+  // ---- notification ----
+  let toastTimer = null;
+  function showToast(message){
+    const t = $('toast');
+    t.textContent = message;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>t.classList.remove('show'), 3200);
   }
 
-  function renderCityList(byCity){
-    const wrap = $('cityList');
-    wrap.innerHTML = '';
-    const data = byCity || {};
-    const keys = orderedCities(data);
-    if(!keys.length){ wrap.innerHTML = '<div class="hint">هێشتا هیچ داتایەک نییە</div>'; return; }
-    keys.forEach(city => {
-      const c = data[city] || { total:0, checkedIn:0 };
-      const pct = c.total ? Math.round((c.checkedIn / c.total) * 100) : 0;
-      const row = document.createElement('div');
-      row.className = 'city-row';
-      row.style.cursor = 'pointer';
-      row.title = 'کلیک بکە بۆ لیستی ئەم شارە';
-      row.innerHTML = '<div class="city-top"><div class="city-name">' + city + '</div><div class="city-counts"><b>' + c.checkedIn + '</b> / ' + c.total + '</div></div><div class="city-bar-bg"><div class="city-bar-fill" style="width:' + pct + '%"></div></div>';
-      row.addEventListener('click', ()=>openReport(city));
-      wrap.appendChild(row);
-    });
+  // ---- report by city ----
+  function escapeHtml(value){
+    return String(value == null ? '' : value)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
   }
 
-  function openReport(city){
-    selectedCity = city || '';
-    $('reportModal').classList.add('show');
-    renderCityPicks();
-    if(selectedCity) loadCityStudents(selectedCity);
-    else { $('reportTitle').textContent='لیستی شارەکان'; $('reportBody').innerHTML='<div class="hint">شارێک هەڵبژێرە</div>'; }
+  function renderReport(records){
+    const body = $('reportBody');
+    if(!records.length){
+      body.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;">هیچ قوتابییەک نەدۆزرایەوە.</td></tr>';
+      return;
+    }
+    body.innerHTML = records.map((r,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td>${escapeHtml(r.fullName)}</td>
+        <td>${escapeHtml(r.city)}</td>
+        <td>${escapeHtml(r.school)}</td>
+        <td>${escapeHtml(r.branch)}</td>
+        <td>${escapeHtml(r.gender)}</td>
+        <td>${escapeHtml(r.score)}</td>
+        <td>${escapeHtml(r.favorite)}</td>
+        <td>${escapeHtml(r.giftExpectation)}</td>
+        <td>${r.checkedIn ? '✅ داخل بوو' : '—'}</td>
+      </tr>`).join('');
   }
 
-  function renderCityPicks(){
-    const wrap = $('cityPicks');
-    const keys = orderedCities(lastByCity);
-    wrap.innerHTML = '';
-    keys.forEach(city=>{
-      const b=document.createElement('button');
-      b.className='city-pick' + (city===selectedCity ? ' active' : '');
-      b.textContent=city + ' (' + ((lastByCity[city]||{}).total||0) + ')';
-      b.addEventListener('click',()=>{ selectedCity=city; renderCityPicks(); loadCityStudents(city); });
-      wrap.appendChild(b);
-    });
-  }
-
-  async function loadCityStudents(city){
-    $('reportTitle').textContent = 'لیستی تۆمارکراوانی ' + city;
-    $('reportInfo').textContent = 'چاوەڕوانبە...';
-    $('reportBody').innerHTML = '<div class="hint">داتا بار دەکرێت...</div>';
+  async function loadReport(){
     try{
-      const r = await callApi({ action:'studentsByCity', city, adminKey:adminKey() });
-      const students = r.students || r.data || [];
-      const total = students.length;
-      const checked = students.filter(x=>x.checkedIn===true || x.checkedIn==='TRUE' || x.status==='checkedIn').length;
-      $('reportInfo').textContent = 'کۆی قوتابیان: ' + total + ' — چوونەژوورەوە: ' + checked;
-      if(!total){ $('reportBody').innerHTML='<div class="hint">هیچ قوتابییەک بۆ ئەم شارە نەدۆزرایەوە</div>'; return; }
-      const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-      $('reportBody').innerHTML='<table class="report-table"><thead><tr><th>#</th><th>ناو</th><th>قوتابخانە</th><th>بارودۆخ</th></tr></thead><tbody>'+students.map((x,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(x.name||x.studentName||'')+'</td><td>'+esc(x.school||x.schoolName||'')+'</td><td>'+((x.checkedIn===true||x.checkedIn==='TRUE'||x.status==='checkedIn')?'چووەتە ژوورەوە':'تۆمارکراو')+'</td></tr>').join('')+'</tbody></table>';
+      const city = $('cityFilter').value || '';
+      const r = await callApi({ action:'report', city });
+      if(!r.success) throw new Error('report_failed');
+
+      const sel = $('cityFilter');
+      const current = sel.value;
+      const cities = r.cities || [];
+      sel.innerHTML = '<option value="">هەموو شارەکان</option>' +
+        cities.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      if(cities.includes(current)) sel.value = current;
+
+      renderReport(r.records || []);
     }catch(e){
-      $('reportInfo').textContent='';
-      $('reportBody').innerHTML='<div class="hint">نەتوانرا لیستی قوتابیان بهێنرێت. پێویستە لە Apps Script کردارێکی studentsByCity زیاد بکرێت.</div>';
+      $('reportBody').innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;">نەتوانرا ڕاپۆرت باربکرێت.</td></tr>';
     }
   }
 
-  $('statRegCard').addEventListener('click', ()=>openReport());
-  $('closeReportBtn').addEventListener('click', ()=>$('reportModal').classList.remove('show'));
-  $('reportModal').addEventListener('click', e=>{ if(e.target===$('reportModal')) $('reportModal').classList.remove('show'); });
-  $('printCityBtn').addEventListener('click', ()=>{ if(selectedCity) window.print(); else showToast('تکایە یەکەم شارێک هەڵبژێرە'); });
+  $('cityFilter').addEventListener('change', ()=>{
+    refreshStats();
+    loadReport();
+  });
+
+  $('printReportBtn').addEventListener('click', async ()=>{
+    await loadReport();
+    const city = $('cityFilter').value || 'هەموو شارەکان';
+    const table = $('reportArea').innerHTML;
+    $('printArea').innerHTML = `
+      <h2>ڕاپۆرتی قوتابیان — ${escapeHtml(city)}</h2>
+      <p style="text-align:center;">ئیڤینتی ئاراستەی زانکۆ</p>
+      ${table}
+    `;
+    $('printArea').hidden = false;
+    window.print();
+    setTimeout(()=>{ $('printArea').hidden = true; }, 500);
+  });
+
+  // ---- dashboard ----
+  $('refreshBtn').addEventListener('click', ()=>{
+    refreshStats();
+    loadReport();
+  });
 
   async function refreshStats(){
     try{
-      const r = await callApi({ action:'stats', adminKey:adminKey() });
-      const regCount = r.total || 0, inCount = r.checkedIn || 0;
-      lastByCity = r.byCity || {};
+      const r = await callApi({ action:'stats', city: $('cityFilter') ? $('cityFilter').value : '' });
+      const regCount = r.total || 0;
+      const inCount = r.checkedIn || 0;
       $('statReg').textContent = regCount;
       $('statIn').textContent = inCount;
       const pct = regCount ? Math.round((inCount/regCount)*100) : 0;
       $('barFill').style.width = pct + '%';
       $('barLabel').textContent = '٪' + pct + ' چوونەژوورەوە';
-      renderCityList(lastByCity);
     }catch(e){}
   }
 </script>
